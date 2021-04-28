@@ -20,7 +20,7 @@ inputDir=$2
 # number of files per directory
 numFiles=$3
 
-# crete directory
+# create directory
 mkdir $inputDir
 
 # parse input file and add records to files with round robin order
@@ -32,7 +32,7 @@ cat $inputFile | awk -v n=$numFiles -v dir=$inputDir '
 			for (i = 0; i < n; i++){
 				touch dir$4"/"$4"-"i+1".txt"
 			}	
-		} 
+		}
 		print $0 >> dir$4"/"$4"-"(countries[$4]%n)+1".txt"
 	}
 '
