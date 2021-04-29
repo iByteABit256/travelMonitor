@@ -33,7 +33,7 @@ cat $inputFile | awk -v n=$numFiles -v dir=$inputDir '
 				touch dir$4"/"$4"-"i+1".txt"
 			}	
 		}
-		print $1" "$2" "$3" "$5" "$6" "$7" "$8" "$9 >> dir$4"/"$4"-"(countries[$4]%n)+1".txt"
+		print $1" "$2" "$3" "$5" "$6" "$7" "$8 >> dir$4"/"$4"-"(countries[$4]%n)+1".txt"
 	}
 '
 
