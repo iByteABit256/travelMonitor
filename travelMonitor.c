@@ -92,32 +92,44 @@ int main(int argc, char *argv[]){
         sprintf(str, "%d", i);
         
         mkfifo(strncat(temp, str, 20), 0666);
+
+        pid_t pid = fork();
+        if(pid == -1){
+            fprintf(stderr, "Error during fork\n");
+            exit(1);
+        }else if(pid == 0){
+            printf("I am child %u\n", getpid());
+            execl("./monitor", "./monitor", temp, (char *)NULL);
+            exit(1);
+        }
     }
+
+    sleep(1);
   
-    char arr1[80], arr2[80];
-    while (1)
-    {
-        // Open FIFO for write only
-        fd = open(myfifo, O_WRONLY);
+    // char arr1[80], arr2[80];
+    // while (1)
+    // {
+    //     // Open FIFO for write only
+    //     fd = open(strcat(myfifo, "0"), O_WRONLY);
   
-        // Take an input arr2ing from user.
-        // 80 is maximum length
-        fgets(arr2, 80, stdin);
+    //     // Take an input arr2ing from user.
+    //     // 80 is maximum length
+    //     fgets(arr2, 80, stdin);
   
-        // Write the input arr2ing on FIFO
-        // and close it
-        write(fd, arr2, strlen(arr2)+1);
-        close(fd);
+    //     // Write the input arr2ing on FIFO
+    //     // and close it
+    //     write(fd, arr2, strlen(arr2)+1);
+    //     close(fd);
   
-        // Open FIFO for Read only
-        fd = open(myfifo, O_RDONLY);
+    //     // Open FIFO for Read only
+    //     fd = open(myfifo, O_RDONLY);
   
-        // Read from FIFO
-        read(fd, arr1, sizeof(arr1));
+    //     // Read from FIFO
+    //     read(fd, arr1, sizeof(arr1));
   
-        // Print the read message
-        printf("User2: %s\n", arr1);
-        close(fd);
-    }
+    //     // Print the read message
+    //     printf("User2: %s\n", arr1);
+    //     close(fd);
+    // }
     return 0;
 }
