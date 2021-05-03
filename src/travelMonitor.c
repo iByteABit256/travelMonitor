@@ -6,6 +6,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <dirent.h>
+#include "../lib/lists/lists.h"
+
+// String compare function wrapper
+int compareStr(void *a, void *b){
+    return strcmp((char *)a, (char *)b);
+}
 
 // Parses parameters of executable
 void parseExecutableParameters(int argc, char *argv[], int *monitorNum, int *buffSize, int *bloomSize, char **inDir){
@@ -110,14 +116,19 @@ int main(int argc, char *argv[]){
     DIR *inDir;
     struct dirent *direntp;
 
+    Listptr subdirs = ListCreate();
+
     if((inDir = opendir(input_dir)) == NULL){
         fprintf(stderr, "Could not open %s\n", input_dir);
     }else{
         while((direntp = readdir(inDir)) != NULL){
             printf("inode %d -> entry %s\n", (int)direntp->d_ino, direntp->d_name);
+            ListInsertSorted(subdirs, direntp->d_name, &compareStr);
         }
         closedir(inDir);
     }
+
+    ListPrintList(subdirs);
   
     // char arr1[80], arr2[80];
     // while (1)

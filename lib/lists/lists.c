@@ -3,7 +3,7 @@
 #include <string.h>
 #include "listsTypes.h"
 
-char *ItemFormat = "%d";
+char *ItemFormat = "%s";
 
 // Initializes new list
 Listptr ListCreate(){ 
@@ -93,6 +93,29 @@ void ListInsertAfter(Listptr list, ItemType item, Listptr node){
 	}else{
 		printf("Error: Incorrect parameters for insertAfter(Listptr, ItemType, Listptr)\n");
 	}
+}
+
+// inserts in a sorted way
+void ListInsertSorted(Listptr list, ItemType item, int (compareFunc)(ItemType a, ItemType b)){
+   if(list == NULL){
+      printf("Error: list not initialized\n");
+   }
+   Listptr new = malloc(sizeof(Listnode));
+   new->head = list->head;
+   new->tail = list->tail;
+   new->next = list->tail;
+   new->value = item;
+   Listptr temp;
+
+   for(temp = list->head; temp->next != list->tail; temp = temp->next){
+	   if(compareFunc(item, temp->next->value) < 0){
+		   new->next = temp->next;
+		   temp->next = new;
+		   return;
+	   }
+   }
+   new->next = temp->next;
+   temp->next = new;
 }
 
 // deletes last element of list

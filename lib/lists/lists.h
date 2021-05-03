@@ -4,6 +4,7 @@ void ListPrintList(Listptr list);
 Listptr ListSearch(Listptr list, ItemType item);
 void ListInsertLast(Listptr list, ItemType item);
 void ListInsertAfter(Listptr list, ItemType item, Listptr node);
+void ListInsertSorted(Listptr list, ItemType item, int (compareFunction)(ItemType a, ItemType b));
 void ListDeleteLast(Listptr list);
 void ListDelete(Listptr list, Listptr node);
 void ListDestroy(Listptr list);
