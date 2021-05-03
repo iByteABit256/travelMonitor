@@ -170,9 +170,6 @@ int main(int argc, char *argv[]){
         char postfix[20];
         sprintf(postfix, "%d", i);
 
-        // char EOT[2];
-        // EOT[0] = 0x04;
-        // EOT[1] = '\n';
         char EOT[20] = "Hello!";
 
         strcat(temp, postfix);

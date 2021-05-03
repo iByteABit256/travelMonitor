@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
+#include "../lib/lists/lists.h"
   
 int main(int argc, char *argv[])
 {
@@ -23,10 +24,9 @@ int main(int argc, char *argv[])
 
     printf("Opening %s\n", pipename);
     
-    // char EOT[2];
-    // EOT[0] = 0x04;
-    // EOT[1] = '\n';
     char EOT[20] = "Hello!";
+
+    Listptr countries = ListCreate();
 
     fd = open(pipename, O_RDONLY);
 
@@ -36,12 +36,18 @@ int main(int argc, char *argv[])
 
     while(strcmp(buff, EOT)){
         nanosleep(tspec, NULL);
-        if(!read(fd, buff, 80)){
+        if(!read(fd, buff, 80) || !strcmp(buff, EOT)){
             continue;
         }
-        printf("Process %u: Subdirectory %s\n", getpid(), buff);
+        //printf("Process %u: Subdirectory %s\n", getpid(), buff);
+        char *country = malloc(strlen(buff)+1);
+        strcpy(country, buff);
+        ListInsertLast(countries, country);
     }
     close(fd);
+
+    printf("Process %u: Subdirectories:\n", getpid());
+    ListPrintList(countries);
 
     exit(0);
   

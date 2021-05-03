@@ -25,10 +25,10 @@ OBJ = travelMonitor.o lists.o
 TARGET2 = monitor
 
 # source files
-SRC2 = src/monitor.c
+SRC2 = src/monitor.c lib/lists/lists.c
 
 # object files
-OBJ2 = monitor.o
+OBJ2 = monitor.o lists.o
 
 # make all by default
 default: all
