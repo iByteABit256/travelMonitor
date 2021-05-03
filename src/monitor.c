@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
   
 int main(int argc, char *argv[])
 {
@@ -22,15 +23,22 @@ int main(int argc, char *argv[])
 
     printf("Opening %s\n", pipename);
     
-    char EOT[2];
-    EOT[0] = 0x04;
-    EOT[1] = '\n';
+    // char EOT[2];
+    // EOT[0] = 0x04;
+    // EOT[1] = '\n';
+    char EOT[20] = "Hello!";
 
     fd = open(pipename, O_RDONLY);
 
+    struct timespec *tspec = malloc(sizeof(struct timespec));
+    tspec->tv_sec = 0;
+    tspec->tv_nsec = 2000000;
+
     while(strcmp(buff, EOT)){
-        sleep(1);
-        read(fd, buff, 80);
+        nanosleep(tspec, NULL);
+        if(!read(fd, buff, 80)){
+            continue;
+        }
         printf("Process %u: Subdirectory %s\n", getpid(), buff);
     }
     close(fd);

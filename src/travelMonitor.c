@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <time.h>
 #include "../lib/lists/lists.h"
 
 // String compare function wrapper
@@ -80,6 +81,10 @@ int main(int argc, char *argv[]){
     int sizeOfBloom;
     char *input_dir;
 
+    struct timespec *tspec = malloc(sizeof(struct timespec));
+    tspec->tv_sec = 0;
+    tspec->tv_nsec = 2000000;
+
     parseExecutableParameters(argc, argv, &numMonitors, &bufferSize, &sizeOfBloom, &input_dir);
 
     printf("numMonitors: %d\nbufferSize: %d\nsizeOfBloom: %d\ninput_dir: %s\n", numMonitors, bufferSize, sizeOfBloom, input_dir);
@@ -111,7 +116,7 @@ int main(int argc, char *argv[]){
         }
     }
 
-    sleep(1);
+    nanosleep(tspec, NULL);
 
     DIR *inDir;
     struct dirent *direntp;
@@ -130,6 +135,8 @@ int main(int argc, char *argv[]){
 
     ListPrintList(subdirs);
 
+    
+
     int count = 0;
 
     for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
@@ -146,8 +153,11 @@ int main(int argc, char *argv[]){
         sprintf(postfix, "%d", count%numMonitors);
 
         strcat(temp, postfix);
+        //strcat(dirname, "\n");
         fd = open(temp, O_WRONLY);
+        printf("Writing %s to pipe %d\n", dirname, count%numMonitors);
         write(fd, dirname, strlen(dirname)+1);
+        nanosleep(tspec, NULL);
         close(fd);
 
         count++;
@@ -158,15 +168,18 @@ int main(int argc, char *argv[]){
         strncpy(temp, myfifo, 20);
 
         char postfix[20];
-        sprintf(postfix, "%d", count%numMonitors);
+        sprintf(postfix, "%d", i);
 
-        char EOT[2];
-        EOT[0] = 0x04;
-        EOT[1] = '\n';
+        // char EOT[2];
+        // EOT[0] = 0x04;
+        // EOT[1] = '\n';
+        char EOT[20] = "Hello!";
 
         strcat(temp, postfix);
         fd = open(temp, O_WRONLY);
+        printf("Writing %s to pipe %d\n", EOT, i);
         write(fd, EOT, strlen(EOT)+1);
+        nanosleep(tspec, NULL);
         close(fd);
     }
   
