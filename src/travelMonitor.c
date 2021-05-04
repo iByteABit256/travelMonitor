@@ -129,6 +129,46 @@ int main(int argc, char *argv[]){
     }
 
     ListPrintList(subdirs);
+
+    int count = 0;
+
+    for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
+        char *dirname = l->value;
+
+        if(!strcmp(dirname, ".") || !strcmp(dirname, "..")){
+            continue;
+        }
+
+        char temp[20];
+        strncpy(temp, myfifo, 20);
+
+        char postfix[20] = "";
+        sprintf(postfix, "%d", count%numMonitors);
+
+        strcat(temp, postfix);
+        fd = open(temp, O_WRONLY);
+        write(fd, dirname, strlen(dirname)+1);
+        close(fd);
+
+        count++;
+    }
+
+    for(int i = 0; i < numMonitors; i++){
+        char temp[20];
+        strncpy(temp, myfifo, 20);
+
+        char postfix[20];
+        sprintf(postfix, "%d", count%numMonitors);
+
+        char EOT[2];
+        EOT[0] = 0x04;
+        EOT[1] = '\n';
+
+        strcat(temp, postfix);
+        fd = open(temp, O_WRONLY);
+        write(fd, EOT, strlen(EOT)+1);
+        close(fd);
+    }
   
     // char arr1[80], arr2[80];
     // while (1)

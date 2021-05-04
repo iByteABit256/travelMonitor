@@ -8,7 +8,7 @@
   
 int main(int argc, char *argv[])
 {
-    int fd1;
+    int fd;
   
     // FIFO file path
     //char * myfifo = "/tmp/myfifo";
@@ -17,8 +17,24 @@ int main(int argc, char *argv[])
     // mkfifo(<pathname>,<permission>)
     //mkfifo(myfifo, 0666);
 
-    printf("Opening %s\n", argv[1]);
+    char *pipename = argv[1];
+    char buff[80] = "";
+
+    printf("Opening %s\n", pipename);
     
+    char EOT[2];
+    EOT[0] = 0x04;
+    EOT[1] = '\n';
+
+    fd = open(pipename, O_RDONLY);
+
+    while(strcmp(buff, EOT)){
+        sleep(1);
+        read(fd, buff, 80);
+        printf("Process %u: Subdirectory %s\n", getpid(), buff);
+    }
+    close(fd);
+
     exit(0);
   
     // char str1[80], str2[80];
