@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <time.h>
 #include "../lib/lists/lists.h"
+#include "../lib/bloomfilter/bloomfilter.h"
 
 // String compare function wrapper
 int compareStr(void *a, void *b){
@@ -87,7 +88,7 @@ int main(int argc, char *argv[]){
 
     parseExecutableParameters(argc, argv, &numMonitors, &bufferSize, &sizeOfBloom, &input_dir);
 
-    printf("numMonitors: %d\nbufferSize: %d\nsizeOfBloom: %d\ninput_dir: %s\n", numMonitors, bufferSize, sizeOfBloom, input_dir);
+    //printf("numMonitors: %d\nbufferSize: %d\nsizeOfBloom: %d\ninput_dir: %s\n", numMonitors, bufferSize, sizeOfBloom, input_dir);
 
     int fd;
   
@@ -110,7 +111,7 @@ int main(int argc, char *argv[]){
             fprintf(stderr, "Error during fork\n");
             exit(1);
         }else if(pid == 0){
-            printf("I am child %u\n", getpid());
+            //printf("I am child %u\n", getpid());
             execl("./monitor", "./monitor", temp, (char *)NULL);
             exit(1);
         }
@@ -127,22 +128,32 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "Could not open %s\n", input_dir);
     }else{
         while((direntp = readdir(inDir)) != NULL){
-            printf("inode %d -> entry %s\n", (int)direntp->d_ino, direntp->d_name);
-            ListInsertSorted(subdirs, direntp->d_name, &compareStr);
+            //printf("inode %d -> entry %s\n", (int)direntp->d_ino, direntp->d_name);
+            char *subdir = malloc(sizeof(char)*100);
+            strcat(subdir, input_dir);
+            strcat(subdir, direntp->d_name);
+            ListInsertSorted(subdirs, subdir, &compareStr);
         }
         closedir(inDir);
     }
 
-    ListPrintList(subdirs);
+    //ListPrintList(subdirs);
 
-    
+    char *current = malloc(strlen(input_dir)+1);
+    strcpy(current, input_dir);
+    strcat(current, ".");
+
+    char *previous = malloc(strlen(input_dir)+1);
+    strcpy(previous, input_dir);
+    strcat(previous, "..");
 
     int count = 0;
+
 
     for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
         char *dirname = l->value;
 
-        if(!strcmp(dirname, ".") || !strcmp(dirname, "..")){
+        if(!strcmp(dirname, current) || !strcmp(dirname, previous)){
             continue;
         }
 
@@ -155,7 +166,7 @@ int main(int argc, char *argv[]){
         strcat(temp, postfix);
         //strcat(dirname, "\n");
         fd = open(temp, O_WRONLY);
-        printf("Writing %s to pipe %d\n", dirname, count%numMonitors);
+        //printf("Writing %s to pipe %d\n", dirname, count%numMonitors);
         write(fd, dirname, strlen(dirname)+1);
         nanosleep(tspec, NULL);
         close(fd);
@@ -174,7 +185,7 @@ int main(int argc, char *argv[]){
 
         strcat(temp, postfix);
         fd = open(temp, O_WRONLY);
-        printf("Writing %s to pipe %d\n", EOT, i);
+        //printf("Writing %s to pipe %d\n", EOT, i);
         write(fd, EOT, strlen(EOT)+1);
         nanosleep(tspec, NULL);
         close(fd);

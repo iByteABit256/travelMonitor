@@ -6,7 +6,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
+#include <dirent.h>
 #include "../lib/lists/lists.h"
+#include "../lib/bloomfilter/bloomfilter.h"
   
 int main(int argc, char *argv[])
 {
@@ -22,7 +24,7 @@ int main(int argc, char *argv[])
     char *pipename = argv[1];
     char buff[80] = "";
 
-    printf("Opening %s\n", pipename);
+    //printf("Opening %s\n", pipename);
     
     char EOT[20] = "Hello!";
 
@@ -46,8 +48,36 @@ int main(int argc, char *argv[])
     }
     close(fd);
 
-    printf("Process %u: Subdirectories:\n", getpid());
-    ListPrintList(countries);
+    //printf("Process %u: Subdirectories:\n", getpid());
+    //ListPrintList(countries);
+
+    DIR *subdir;
+    struct dirent *direntp;
+
+    Listptr filepaths = ListCreate();
+
+    for(Listptr l = countries->head->next; l != l->tail; l = l->next){
+        char *subdirName = l->value;
+
+        //printf("subdirName = %s\n", subdirName);
+        if((subdir = opendir(subdirName)) == NULL){
+            fprintf(stderr, "Could not open %s\n", subdirName);
+        }else{     
+            while((direntp = readdir(subdir)) != NULL){
+                if(strcmp(direntp->d_name, ".") && strcmp(direntp->d_name, "..")){
+                    char *temp = malloc(80);
+                    strcpy(temp, subdirName);
+                    strcat(temp, "/");
+                    strcat(temp, direntp->d_name);
+                    ListInsertLast(filepaths, temp);
+                }
+            }
+            closedir(subdir);
+        }
+    }
+
+    ListPrintList(filepaths);
+    printf("\n\n");
 
     exit(0);
   
