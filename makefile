@@ -25,10 +25,11 @@ OBJ = travelMonitor.o lists.o
 TARGET2 = monitor
 
 # source files
-SRC2 = src/monitor.c lib/lists/lists.c
+SRC2 = src/monitor.c lib/lists/lists.c lib/hashtable/hashtable.c lib/bloomfilter/bloomfilter.c \
+	src/parser.c src/vaccineMonitor.c lib/skiplist/skiplist.c lib/date/date.c lib/hash/hash.c
 
 # object files
-OBJ2 = monitor.o lists.o
+OBJ2 = monitor.o lists.o hashtable.o bloomfilter.o parser.o vaccineMonitor.o skiplist.o date.o hash.o
 
 # make all by default
 default: all
@@ -52,6 +53,27 @@ $(TARGET2): $(OBJ2)
 # make object files
 monitor.o: src/monitor.c
 	$(CC) $(CFLAGS) -c src/monitor.c
+
+hashtable.o: lib/lists/lists.c lib/hashtable/hashtable.c 
+	$(CC) $(CFLAGS) -c lib/hashtable/hashtable.c
+
+bloomfilter.o: lib/bloomfilter/bloomfilter.c lib/hash/hash.c
+	$(CC) $(CFLAGS) -c lib/bloomfilter/bloomfilter.c
+
+parser.o: src/parser.c lib/skiplist/skiplist.c lib/bloomfilter/bloomfilter.c
+	$(CC) $(CFLAGS) -c src/parser.c
+
+vaccineMonitor.o: src/vaccineMonitor.c lib/date/date.c
+	$(CC) $(CFLAGS) -c src/vaccineMonitor.c
+
+skiplist.o: lib/skiplist/skiplist.c
+	$(CC) $(CFLAGS) -c lib/skiplist/skiplist.c
+
+date.o: lib/date/date.c
+	$(CC) $(CFLAGS) -c lib/date/date.c
+
+hash.o: lib/hash/hash.c
+	$(CC) $(CFLAGS) -c lib/hash/hash.c
 
 # clean up
 clean:

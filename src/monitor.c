@@ -9,10 +9,14 @@
 #include <dirent.h>
 #include "../lib/lists/lists.h"
 #include "../lib/bloomfilter/bloomfilter.h"
+#include "../lib/hashtable/htInterface.h"
+#include "../src/parser.h"
+#include "../src/vaccineMonitor.h"
   
 int main(int argc, char *argv[])
 {
     int fd;
+    int bloomsize = 69;
   
     // FIFO file path
     //char * myfifo = "/tmp/myfifo";
@@ -28,7 +32,7 @@ int main(int argc, char *argv[])
     
     char EOT[20] = "Hello!";
 
-    Listptr countries = ListCreate();
+    Listptr countryPaths = ListCreate();
 
     fd = open(pipename, O_RDONLY);
 
@@ -44,19 +48,19 @@ int main(int argc, char *argv[])
         //printf("Process %u: Subdirectory %s\n", getpid(), buff);
         char *country = malloc(strlen(buff)+1);
         strcpy(country, buff);
-        ListInsertLast(countries, country);
+        ListInsertLast(countryPaths, country);
     }
     close(fd);
 
     //printf("Process %u: Subdirectories:\n", getpid());
-    //ListPrintList(countries);
+    //ListPrintList(countryPaths);
 
     DIR *subdir;
     struct dirent *direntp;
 
     Listptr filepaths = ListCreate();
 
-    for(Listptr l = countries->head->next; l != l->tail; l = l->next){
+    for(Listptr l = countryPaths->head->next; l != l->tail; l = l->next){
         char *subdirName = l->value;
 
         //printf("subdirName = %s\n", subdirName);
@@ -76,28 +80,16 @@ int main(int argc, char *argv[])
         }
     }
 
-    ListPrintList(filepaths);
-    printf("\n\n");
+    //ListPrintList(filepaths);
+    HTHash viruses = HTCreate();
+    HTHash persons = HTCreate();
+    HTHash countries = HTCreate();
+    
+    for(Listptr l = filepaths->head->next; l != l->tail; l = l->next){
+        char *filepath = l->value;
+
+        parseInputFile(filepath, bloomsize, persons, countries, viruses);
+    }
 
     exit(0);
-  
-    // char str1[80], str2[80];
-    // while (1)
-    // {
-    //     // First open in read only and read
-    //     fd1 = open(myfifo,O_RDONLY);
-    //     read(fd1, str1, 80);
-  
-    //     // Print the read string and close
-    //     printf("User1: %s\n", str1);
-    //     close(fd1);
-  
-    //     // Now open in write mode and write
-    //     // string taken from user.
-    //     fd1 = open(myfifo,O_WRONLY);
-    //     fgets(str2, 80, stdin);
-    //     write(fd1, str2, strlen(str2)+1);
-    //     close(fd1);
-    // }
-    // return 0;
 }
