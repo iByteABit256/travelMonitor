@@ -146,6 +146,18 @@ int main(int argc, char *argv[]){
 
     int count = 0;
 
+    for(int i = 0; i < numMonitors; i++){
+        char temp[20];
+        strncpy(temp, myfifo, 20);
+
+        char str[20];
+        sprintf(str, "%d", i);
+
+        fd = open(temp, O_WRONLY);
+        write(fd, &sizeOfBloom, sizeof(int));
+        write(fd, &bufferSize, sizeof(int));
+        close(fd);
+    }
 
     for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
         char *dirname = l->value;

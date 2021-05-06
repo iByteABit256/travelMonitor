@@ -16,7 +16,8 @@
 int main(int argc, char *argv[])
 {
     int fd;
-    int bloomsize = 69;
+    int bloomsize;
+    int buffsize;
   
     // FIFO file path
     //char * myfifo = "/tmp/myfifo";
@@ -39,6 +40,11 @@ int main(int argc, char *argv[])
     struct timespec *tspec = malloc(sizeof(struct timespec));
     tspec->tv_sec = 0;
     tspec->tv_nsec = 2000000;
+
+    read(fd, &bloomsize, sizeof(int));
+    read(fd, &buffsize, sizeof(int));
+
+    printf("bloomsize = %d\nbuffsize = %d\n", bloomsize, buffsize);
 
     while(strcmp(buff, EOT)){
         nanosleep(tspec, NULL);
