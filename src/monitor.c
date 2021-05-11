@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <dirent.h>
+#include <poll.h>
 #include "../lib/lists/lists.h"
 #include "../lib/bloomfilter/bloomfilter.h"
 #include "../lib/hashtable/htInterface.h"
@@ -16,7 +17,7 @@
 int main(int argc, char *argv[])
 {
     int fd;
-    int bloomsize;
+    int bloomsize = 69;
     int buffsize;
   
     // FIFO file path
@@ -31,32 +32,72 @@ int main(int argc, char *argv[])
 
     //printf("Opening %s\n", pipename);
     
-    char EOT[20] = "Hello!";
+    // char EOT[20] = "Hello!";
 
     Listptr countryPaths = ListCreate();
 
     fd = open(pipename, O_RDONLY);
 
-    struct timespec *tspec = malloc(sizeof(struct timespec));
-    tspec->tv_sec = 0;
-    tspec->tv_nsec = 2000000;
+    // struct timespec *tspec = malloc(sizeof(struct timespec));
+    // tspec->tv_sec = 0;
+    // tspec->tv_nsec = 2000000;
 
-    read(fd, &bloomsize, sizeof(int));
-    read(fd, &buffsize, sizeof(int));
+    struct pollfd *pfds;
+    int num_open_fds, nfds;
 
-    printf("bloomsize = %d\nbuffsize = %d\n", bloomsize, buffsize);
+    num_open_fds = nfds = 1;
 
-    while(strcmp(buff, EOT)){
-        nanosleep(tspec, NULL);
-        if(!read(fd, buff, 80) || !strcmp(buff, EOT)){
-            continue;
-        }
-        //printf("Process %u: Subdirectory %s\n", getpid(), buff);
-        char *country = malloc(strlen(buff)+1);
-        strcpy(country, buff);
-        ListInsertLast(countryPaths, country);
+    pfds = calloc(nfds, sizeof(struct pollfd));    
+    if(pfds == NULL){
+        perror("calloc error\n");
+        exit(1);
     }
-    close(fd);
+
+    pfds[0].fd = fd;
+    pfds[0].events = POLLIN;
+
+    //nanosleep(tspec, NULL);
+
+    // read(fd, &bloomsize, sizeof(int));
+    // read(fd, &buffsize, sizeof(int));
+
+    // printf("bloomsize = %d\nbuffsize = %d\n", bloomsize, buffsize);
+
+    while(num_open_fds > 0){
+        int ready = poll(pfds, nfds, -1);
+
+        if(ready == -1){
+            perror("poll error\n");
+            exit(1);
+        }
+
+        if(pfds[0].revents != 0){
+            if(pfds[0].revents & POLLIN){
+
+                int bytes_read = read(fd, buff, 80);
+
+                if(bytes_read == -1){ 
+                    perror("Error in read");
+                    exit(1);
+                }else if(bytes_read == 0){
+                    continue;
+                }
+
+                //printf("Process %u: Subdirectory %s\n", getpid(), buff);
+                char *country = malloc(strlen(buff)+1);
+                strcpy(country, buff);
+                ListInsertLast(countryPaths, country);
+
+            }else{
+                if(close(pfds[0].fd)){
+                    perror("close error\n");
+                    exit(1);
+                }
+                pfds[0].fd = -1; //Ignore events on next call
+                num_open_fds--;
+            }
+        }
+    }
 
     //printf("Process %u: Subdirectories:\n", getpid());
     //ListPrintList(countryPaths);
@@ -86,7 +127,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    //ListPrintList(filepaths);
+    ListPrintList(filepaths);
     HTHash viruses = HTCreate();
     HTHash persons = HTCreate();
     HTHash countries = HTCreate();

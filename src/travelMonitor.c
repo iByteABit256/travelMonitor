@@ -99,9 +99,15 @@ int main(int argc, char *argv[]){
         strncpy(temp, myfifo, 20);
 
         char str[20];
-        sprintf(str, "%d", i);
+        sprintf(str, "%dv", i);
         
         mkfifo(strncat(temp, str, 20), 0666);
+
+        char temp2[20];
+        strcpy(temp2, temp);
+        temp2[strlen(temp)] = '^';
+
+        mkfifo(strncat(temp2, str, 20), 0666);
 
         pid_t pid = fork();
         if(pid == -1){
@@ -109,12 +115,12 @@ int main(int argc, char *argv[]){
             exit(1);
         }else if(pid == 0){
             //printf("I am child %u\n", getpid());
-            execl("./monitor", "./monitor", temp, (char *)NULL);
+            execl("./monitor", "./monitor", temp, temp2, (char *)NULL);
             exit(1);
         }
     }
 
-    nanosleep(tspec, NULL);
+    //nanosleep(tspec, NULL);
 
     DIR *inDir;
     struct dirent *direntp;
@@ -144,20 +150,33 @@ int main(int argc, char *argv[]){
     strcpy(previous, input_dir);
     strcat(previous, "..");
 
-    int count = 0;
+    // for(int i = 0; i < numMonitors; i++){
+    //     char temp[20];
+    //     strncpy(temp, myfifo, 20);
+
+    //     char str[20];
+    //     sprintf(str, "%d", i);
+
+    //     fd = open(temp, O_WRONLY);
+    //     write(fd, &sizeOfBloom, sizeof(int));
+    //     write(fd, &bufferSize, sizeof(int));
+    //     close(fd);
+    // }
+    int fd_arr[numMonitors];
 
     for(int i = 0; i < numMonitors; i++){
         char temp[20];
         strncpy(temp, myfifo, 20);
 
-        char str[20];
-        sprintf(str, "%d", i);
+        char postfix[20] = "";
+        sprintf(postfix, "%dv", i);
 
-        fd = open(temp, O_WRONLY);
-        write(fd, &sizeOfBloom, sizeof(int));
-        write(fd, &bufferSize, sizeof(int));
-        close(fd);
+        strcat(temp, postfix);
+
+        fd_arr[i] = open(temp, O_WRONLY);
     }
+
+    int count = 0;
 
     for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
         char *dirname = l->value;
@@ -166,38 +185,13 @@ int main(int argc, char *argv[]){
             continue;
         }
 
-        char temp[20];
-        strncpy(temp, myfifo, 20);
-
-        char postfix[20] = "";
-        sprintf(postfix, "%d", count%numMonitors);
-
-        strcat(temp, postfix);
-        //strcat(dirname, "\n");
-        fd = open(temp, O_WRONLY);
-        //printf("Writing %s to pipe %d\n", dirname, count%numMonitors);
-        write(fd, dirname, strlen(dirname)+1);
-        nanosleep(tspec, NULL);
-        close(fd);
+        write(fd_arr[count%numMonitors], dirname, strlen(dirname)+1);
 
         count++;
     }
 
     for(int i = 0; i < numMonitors; i++){
-        char temp[20];
-        strncpy(temp, myfifo, 20);
-
-        char postfix[20];
-        sprintf(postfix, "%d", i);
-
-        char EOT[20] = "Hello!";
-
-        strcat(temp, postfix);
-        fd = open(temp, O_WRONLY);
-        //printf("Writing %s to pipe %d\n", EOT, i);
-        write(fd, EOT, strlen(EOT)+1);
-        nanosleep(tspec, NULL);
-        close(fd);
+        close(fd_arr[i]);
     }
 
     return 0;
