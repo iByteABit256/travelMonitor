@@ -13,12 +13,14 @@
 #include "../lib/hashtable/htInterface.h"
 #include "../src/parser.h"
 #include "../src/vaccineMonitor.h"
+
+#define INITIAL_BUFFSIZE 100
   
 int main(int argc, char *argv[])
 {
     int fd;
     int bloomsize = 69;
-    int buffsize;
+    int buffsize = INITIAL_BUFFSIZE;
   
     // FIFO file path
     //char * myfifo = "/tmp/myfifo";
@@ -28,7 +30,7 @@ int main(int argc, char *argv[])
     //mkfifo(myfifo, 0666);
 
     char *pipename = argv[1];
-    char buff[80] = "";
+    char *buff = malloc(sizeof(char)*buffsize);
 
     //printf("Opening %s\n", pipename);
     
@@ -63,6 +65,8 @@ int main(int argc, char *argv[])
 
     // printf("bloomsize = %d\nbuffsize = %d\n", bloomsize, buffsize);
 
+    int msgNum = 0;
+
     while(num_open_fds > 0){
         int ready = poll(pfds, nfds, -1);
 
@@ -74,20 +78,33 @@ int main(int argc, char *argv[])
         if(pfds[0].revents != 0){
             if(pfds[0].revents & POLLIN){
 
-                int bytes_read = read(fd, buff, 80);
+                //printf("buf1 = %s\n", buff);
+                int bytes_read = read(fd, buff, buffsize);
+                //printf("buf2 = %s\n", buff);
 
-                if(bytes_read == -1){ 
+                if(bytes_read == -1){
                     perror("Error in read");
                     exit(1);
                 }else if(bytes_read == 0){
                     continue;
                 }
 
-                //printf("Process %u: Subdirectory %s\n", getpid(), buff);
-                char *country = malloc(strlen(buff)+1);
-                strcpy(country, buff);
-                ListInsertLast(countryPaths, country);
+                //printf("msgnum = %d, buff = %s\n", msgNum, buff);
 
+                if(msgNum == 0){
+                    buffsize = atoi(buff);
+                    //printf("buffsize = %d\n", buffsize);
+                }else if(msgNum == 1){
+                    bloomsize = atoi(buff);
+                    //printf("bloomsize = %d\n", bloomsize);
+                }else{
+                    //printf("Process %u: Subdirectory %s\n", getpid(), buff);
+                    char *country = malloc(strlen(buff)+1);
+                    strcpy(country, buff);
+                    ListInsertLast(countryPaths, country);
+                }
+
+                msgNum++;
             }else{
                 if(close(pfds[0].fd)){
                     perror("close error\n");
@@ -116,7 +133,7 @@ int main(int argc, char *argv[])
         }else{     
             while((direntp = readdir(subdir)) != NULL){
                 if(strcmp(direntp->d_name, ".") && strcmp(direntp->d_name, "..")){
-                    char *temp = malloc(80);
+                    char *temp = malloc(buffsize);
                     strcpy(temp, subdirName);
                     strcat(temp, "/");
                     strcat(temp, direntp->d_name);
@@ -127,7 +144,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    ListPrintList(filepaths);
+    //ListPrintList(filepaths);
     HTHash viruses = HTCreate();
     HTHash persons = HTCreate();
     HTHash countries = HTCreate();
@@ -137,6 +154,8 @@ int main(int argc, char *argv[])
 
         parseInputFile(filepath, bloomsize, persons, countries, viruses);
     }
+
+    popStatusByAge(HTGetItem(viruses, "COVID-19"), NULL, NULL, countries, NULL);
 
     exit(0);
 }

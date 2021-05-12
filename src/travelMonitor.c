@@ -10,6 +10,8 @@
 #include "../lib/lists/lists.h"
 #include "../lib/bloomfilter/bloomfilter.h"
 
+#define INITIAL_BUFFSIZE 100
+
 // String compare function wrapper
 int compareStr(void *a, void *b){
     return strcmp((char *)a, (char *)b);
@@ -86,8 +88,6 @@ int main(int argc, char *argv[]){
     parseExecutableParameters(argc, argv, &numMonitors, &bufferSize, &sizeOfBloom, &input_dir);
 
     //printf("numMonitors: %d\nbufferSize: %d\nsizeOfBloom: %d\ninput_dir: %s\n", numMonitors, bufferSize, sizeOfBloom, input_dir);
-
-    int fd;
   
     // FIFO file path
     char *myfifo = "./tmp/";
@@ -105,9 +105,9 @@ int main(int argc, char *argv[]){
 
         char temp2[20];
         strcpy(temp2, temp);
-        temp2[strlen(temp)] = '^';
+        temp2[strlen(temp)-1] = '^';
 
-        mkfifo(strncat(temp2, str, 20), 0666);
+        mkfifo(temp2, 0666);
 
         pid_t pid = fork();
         if(pid == -1){
@@ -132,7 +132,7 @@ int main(int argc, char *argv[]){
     }else{
         while((direntp = readdir(inDir)) != NULL){
             //printf("inode %d -> entry %s\n", (int)direntp->d_ino, direntp->d_name);
-            char *subdir = malloc(sizeof(char)*100);
+            char *subdir = malloc(sizeof(char)*bufferSize);
             strcat(subdir, input_dir);
             strcat(subdir, direntp->d_name);
             ListInsertSorted(subdirs, subdir, &compareStr);
@@ -178,6 +178,17 @@ int main(int argc, char *argv[]){
 
     int count = 0;
 
+    for(int i = 0 ; i < numMonitors; i++){
+        char buff[INITIAL_BUFFSIZE];
+        sprintf(buff, "%d", bufferSize);
+
+        write(fd_arr[i], &buff, INITIAL_BUFFSIZE);
+
+        char buff2[bufferSize];
+        sprintf(buff2, "%d", sizeOfBloom);
+        write(fd_arr[i], &buff2, bufferSize);
+    }
+
     for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
         char *dirname = l->value;
 
@@ -185,7 +196,8 @@ int main(int argc, char *argv[]){
             continue;
         }
 
-        write(fd_arr[count%numMonitors], dirname, strlen(dirname)+1);
+        write(fd_arr[count%numMonitors], dirname, bufferSize);
+        // nanosleep(tspec, NULL);
 
         count++;
     }
