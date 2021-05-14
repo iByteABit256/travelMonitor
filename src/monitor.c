@@ -18,7 +18,7 @@
   
 int main(int argc, char *argv[])
 {
-    int fd;
+    int fd, fd2;
     int bloomsize = 69;
     int buffsize = INITIAL_BUFFSIZE;
   
@@ -30,6 +30,7 @@ int main(int argc, char *argv[])
     //mkfifo(myfifo, 0666);
 
     char *pipename = argv[1];
+    char *pipename2 = argv[2];
     char *buff = malloc(sizeof(char)*buffsize);
 
     //printf("Opening %s\n", pipename);
@@ -39,6 +40,7 @@ int main(int argc, char *argv[])
     Listptr countryPaths = ListCreate();
 
     fd = open(pipename, O_RDONLY);
+    fd2 = open(pipename2, O_RDONLY);
 
     // struct timespec *tspec = malloc(sizeof(struct timespec));
     // tspec->tv_sec = 0;

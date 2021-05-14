@@ -162,7 +162,7 @@ int main(int argc, char *argv[]){
     //     write(fd, &bufferSize, sizeof(int));
     //     close(fd);
     // }
-    int fd_arr[numMonitors];
+    int fd_arr[numMonitors][2];
 
     for(int i = 0; i < numMonitors; i++){
         char temp[20];
@@ -173,7 +173,11 @@ int main(int argc, char *argv[]){
 
         strcat(temp, postfix);
 
-        fd_arr[i] = open(temp, O_WRONLY);
+        fd_arr[i][0] = open(temp, O_WRONLY);
+
+        temp[strlen(temp)-1] = '^';
+
+        fd_arr[i][1] = open(temp, O_WRONLY);
     }
 
     int count = 0;
@@ -182,11 +186,11 @@ int main(int argc, char *argv[]){
         char buff[INITIAL_BUFFSIZE];
         sprintf(buff, "%d", bufferSize);
 
-        write(fd_arr[i], &buff, INITIAL_BUFFSIZE);
+        write(fd_arr[i][0], &buff, INITIAL_BUFFSIZE);
 
         char buff2[bufferSize];
         sprintf(buff2, "%d", sizeOfBloom);
-        write(fd_arr[i], &buff2, bufferSize);
+        write(fd_arr[i][0], &buff2, bufferSize);
     }
 
     for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
@@ -196,14 +200,14 @@ int main(int argc, char *argv[]){
             continue;
         }
 
-        write(fd_arr[count%numMonitors], dirname, bufferSize);
+        write(fd_arr[count%numMonitors][0], dirname, bufferSize);
         // nanosleep(tspec, NULL);
 
         count++;
     }
 
     for(int i = 0; i < numMonitors; i++){
-        close(fd_arr[i]);
+        close(fd_arr[i][0]);
     }
 
     return 0;
