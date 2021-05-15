@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <time.h>
+#include <poll.h>
 #include "../lib/lists/lists.h"
 #include "../lib/bloomfilter/bloomfilter.h"
 
@@ -177,7 +178,7 @@ int main(int argc, char *argv[]){
 
         temp[strlen(temp)-1] = '^';
 
-        fd_arr[i][1] = open(temp, O_WRONLY);
+        fd_arr[i][1] = open(temp, O_RDONLY);
     }
 
     int count = 0;
@@ -208,6 +209,66 @@ int main(int argc, char *argv[]){
 
     for(int i = 0; i < numMonitors; i++){
         close(fd_arr[i][0]);
+        //close(fd_arr[i][1]);
+    }
+
+    struct pollfd *pfds;
+    int num_open_fds, nfds;
+
+    num_open_fds = nfds = numMonitors;
+
+    pfds = calloc(nfds, sizeof(struct pollfd));    
+    if(pfds == NULL){
+        perror("calloc error\n");
+        exit(1);
+    }
+
+    for(int i = 0; i < numMonitors; i++){
+        pfds[i].fd = fd_arr[i][1];
+        pfds[i].events = POLLIN;
+    }
+
+    char buff[bufferSize];
+
+    while(num_open_fds > 0){
+        int ready = poll(pfds, nfds, -1);
+
+        if(ready == -1){
+            perror("poll error\n");
+            exit(1);
+        }
+
+        for(int i = 0; i < nfds; i++){
+            if(pfds[i].revents != 0){
+                printf("  fd=%d; events: %s%s%s%s\n", pfds[i].fd,
+                    (pfds[i].revents & POLLIN)  ? "POLLIN "  : "",
+                    (pfds[i].revents & POLLHUP) ? "POLLHUP " : "",
+                    (pfds[i].revents & POLLERR) ? "POLLERR " : "",
+                    (pfds[i].revents & POLLNVAL) ? "POLLNVAL " : "");
+
+                if(pfds[i].revents & POLLIN){
+
+                    int bytes_read = read(pfds[i].fd, buff, bufferSize);
+
+                    if(bytes_read == -1){
+                        perror("Error in read");
+                        exit(1);
+                    }else if(bytes_read == 0){
+                        continue;
+                    }
+
+                    printf("Message received: %s\n", buff);
+
+                }else{
+                    if(close(pfds[i].fd)){
+                        perror("close error\n");
+                        //exit(1);
+                    }
+                    pfds[i].fd = -1; //Ignore events on next call
+                    num_open_fds--;
+                }
+            }
+        }
     }
 
     return 0;

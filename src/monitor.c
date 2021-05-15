@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
     Listptr countryPaths = ListCreate();
 
     fd = open(pipename, O_RDONLY);
-    fd2 = open(pipename2, O_RDONLY);
+    fd2 = open(pipename2, O_WRONLY);
 
     // struct timespec *tspec = malloc(sizeof(struct timespec));
     // tspec->tv_sec = 0;
@@ -157,7 +157,18 @@ int main(int argc, char *argv[])
         parseInputFile(filepath, bloomsize, persons, countries, viruses);
     }
 
-    popStatusByAge(HTGetItem(viruses, "COVID-19"), NULL, NULL, countries, NULL);
+    //popStatusByAge(HTGetItem(viruses, "COVID-19"), NULL, NULL, countries, NULL);
+
+    for(int i = 0; i < 3; i++){
+        char buff[buffsize];
+        strcpy(buff, "");
+        sprintf(buff, "%d", i);
+
+        //printf("Writing %s to fd %d\n", buff, fd2);
+        write(fd2, buff, buffsize);
+    }
+
+    //close(fd2);
 
     exit(0);
 }
