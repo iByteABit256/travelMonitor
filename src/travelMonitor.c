@@ -8,8 +8,10 @@
 #include <dirent.h>
 #include <time.h>
 #include <poll.h>
+#include "../src/vaccineMonitor.h"
 #include "../lib/lists/lists.h"
 #include "../lib/bloomfilter/bloomfilter.h"
+#include "../lib/hashtable/htInterface.h"
 
 #define INITIAL_BUFFSIZE 100
 
@@ -228,6 +230,15 @@ int main(int argc, char *argv[]){
         pfds[i].events = POLLIN;
     }
 
+    HTHash viruses = HTCreate();
+
+    int msgNum[numMonitors];
+    char *curVirus[numMonitors];
+
+    for(int i = 0; i < numMonitors; i++){
+        msgNum[i] = 0;
+    }
+
     char buff[bufferSize];
 
     while(num_open_fds > 0){
@@ -247,6 +258,7 @@ int main(int argc, char *argv[]){
                     (pfds[i].revents & POLLNVAL) ? "POLLNVAL " : "");
 
                 if(pfds[i].revents & POLLIN){
+                    memset(buff, 0, bufferSize);
 
                     int bytes_read = read(pfds[i].fd, buff, bufferSize);
 
@@ -257,7 +269,25 @@ int main(int argc, char *argv[]){
                         continue;
                     }
 
-                    printf("Message received: %s\n", buff);
+                    if(msgNum[i] == 0){
+                        char *virName = malloc((strlen(buff)+1)*sizeof(char));
+                        strcpy(virName, buff);
+
+                        curVirus[i] = virName;
+
+                        if(!HTExists(viruses, virName)){
+                            Virus vir = newVirus(virName, sizeOfBloom, 9, 0.5);
+                            HTInsert(viruses, virName, vir);
+                        }
+                    }else{
+                        Virus vir = HTGetItem(viruses, curVirus[i]);
+                        BloomFilter bF = vir->vaccinated_bloom;
+
+                        memcpy(bF->bloom+msgNum[i]*bufferSize, buff, bufferSize);
+                    }
+
+                    msgNum[i]++;
+                    printf("Message received: %s\n", buff);      
 
                 }else{
                     if(close(pfds[i].fd)){

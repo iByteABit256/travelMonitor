@@ -159,14 +159,22 @@ int main(int argc, char *argv[])
 
     //popStatusByAge(HTGetItem(viruses, "COVID-19"), NULL, NULL, countries, NULL);
 
-    for(int i = 0; i < 3; i++){
-        char buff[buffsize];
-        strcpy(buff, "");
-        sprintf(buff, "%d", i);
+    for(int i = 0; i < viruses->curSize; i++){
+		for(Listptr l = viruses->ht[i]->next; l != l->tail; l = l->next){
+            Virus v = l->value;
 
-        //printf("Writing %s to fd %d\n", buff, fd2);
-        write(fd2, buff, buffsize);
-    }
+			char buff[buffsize];
+            memset(buff, 0, buffsize);
+            strcpy(buff, v->name);
+
+            write(fd2, buff, buffsize);
+            for(int i = 0; i < bloomsize/buffsize; i++){
+                memset(buff, 0, buffsize);
+                memcpy(buff, v->vaccinated_bloom->bloom+i*buffsize, buffsize);
+                write(fd2, buff, buffsize);
+            }
+		}
+	}
 
     //close(fd2);
 

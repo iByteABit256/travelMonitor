@@ -20,6 +20,18 @@ Country newCountry(char *name){
     return country;
 }
 
+// Initialize new virus
+Virus newVirus(char *name, int bloomSize, int maxlvl, float tossChance){
+    Virus vir = malloc(sizeof(struct virusstr));
+    vir->name = malloc((strlen(name)+1)*sizeof(char)); 
+    strcpy(vir->name, name);
+    vir->vaccinated_bloom = bloomInitialize(bloomSize);
+    vir->vaccinated_persons = newSkiplist(maxlvl, tossChance);
+    vir->not_vaccinated_persons = newSkiplist(maxlvl, tossChance);
+
+    return vir;
+}
+
 // Increments correct age group population
 void incrementAgePopulation(Country country, int age){
     country->agePopulation[MIN(age/20, 3)] += 1;

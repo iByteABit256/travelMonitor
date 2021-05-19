@@ -14,6 +14,8 @@ struct virusstr{
 
 typedef struct virusstr *Virus;
 
+Virus newVirus(char *, int, int, float);
+
 // Country
 struct countrystr{
     char *name;

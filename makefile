@@ -16,10 +16,11 @@ LIBS =
 TARGET = travelMonitor
 
 # source files
-SRC = src/travelMonitor.c lib/lists/lists.c
+SRC = src/travelMonitor.c lib/lists/lists.c lib/hashtable/hashtable.c src/vaccineMonitor.c lib/date/date.c \
+	lib/skiplist/skiplist.c lib/bloomfilter/bloomfilter.c lib/hash/hash.c
 
 # object files
-OBJ = travelMonitor.o lists.o
+OBJ = travelMonitor.o lists.o hashtable.o vaccineMonitor.o date.o skiplist.o bloomfilter.o hash.o
 
 # the name to use for both the target source file, and the output file:
 TARGET2 = monitor
