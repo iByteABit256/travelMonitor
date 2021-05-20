@@ -27,6 +27,24 @@ BloomFilter bloomInitialize(unsigned int size){
     return bl;
 }
 
+// Performs logical OR between two bloom filters
+int bloomOR(BloomFilter dest, BloomFilter src){
+    if(dest == NULL || src == NULL){
+        return 0;
+    }
+
+    if(dest->size != src->size){
+        return 0;
+    }
+
+    for(int i = 0; i < dest->size; i++){
+        if(checkBit(src->bloom, i)){
+            setBit(dest->bloom, i);
+        }
+    }
+    return 1;
+}
+
 // Inserts new entry in bloom filter
 unsigned int bloomInsert(BloomFilter bl, char *s){
 

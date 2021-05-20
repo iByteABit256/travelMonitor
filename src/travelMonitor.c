@@ -234,14 +234,19 @@ int main(int argc, char *argv[]){
 
     int msgNum[numMonitors];
     char *curVirus[numMonitors];
+    BloomFilter tempBloom[numMonitors];
+    int counter[numMonitors];
 
     for(int i = 0; i < numMonitors; i++){
         msgNum[i] = 0;
+        tempBloom[i] = bloomInitialize(sizeOfBloom);
+        counter[i] = 0;
     }
 
-    char buff[bufferSize];
-
     while(num_open_fds > 0){
+        char buff[bufferSize];
+        //memset(buff, '\0', bufferSize);
+
         int ready = poll(pfds, nfds, -1);
 
         if(ready == -1){
@@ -258,7 +263,7 @@ int main(int argc, char *argv[]){
                     (pfds[i].revents & POLLNVAL) ? "POLLNVAL " : "");
 
                 if(pfds[i].revents & POLLIN){
-                    memset(buff, 0, bufferSize);
+                    //memset(buff, '\0', bufferSize);
 
                     int bytes_read = read(pfds[i].fd, buff, bufferSize);
 
@@ -270,6 +275,8 @@ int main(int argc, char *argv[]){
                     }
 
                     if(msgNum[i] == 0){
+                        counter[i]++;
+                        printf("%d viruses read from fd %d\n", counter[i], pfds[i].fd);
                         char *virName = malloc((strlen(buff)+1)*sizeof(char));
                         strcpy(virName, buff);
 
@@ -279,11 +286,19 @@ int main(int argc, char *argv[]){
                             Virus vir = newVirus(virName, sizeOfBloom, 9, 0.5);
                             HTInsert(viruses, virName, vir);
                         }
+                    }else if(msgNum[i]-1 < sizeOfBloom/bufferSize){         
+                        memcpy(tempBloom[i]->bloom+(msgNum[i]-1)*bufferSize, buff, bufferSize);
                     }else{
                         Virus vir = HTGetItem(viruses, curVirus[i]);
                         BloomFilter bF = vir->vaccinated_bloom;
+                        bloomOR(bF, tempBloom[i]);
 
-                        memcpy(bF->bloom+msgNum[i]*bufferSize, buff, bufferSize);
+                        msgNum[i] = 0;
+                        curVirus[i] = NULL;
+                        bloomDestroy(tempBloom[i]);
+                        tempBloom[i] = bloomInitialize(sizeOfBloom);
+
+                        continue;
                     }
 
                     msgNum[i]++;
@@ -300,6 +315,15 @@ int main(int argc, char *argv[]){
             }
         }
     }
+
+    char id[5] = "5510";
+    vaccineStatusBloom(id, HTGetItem(viruses, "COWPOX"));
+
+    char id2[5] = "2057";
+    vaccineStatusBloom(id2, HTGetItem(viruses, "CHOLERA"));
+
+    char id3[5] = "7437";
+    vaccineStatusBloom(id3, HTGetItem(viruses, "SARS-1"));
 
     return 0;
 }

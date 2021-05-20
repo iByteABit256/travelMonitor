@@ -7,7 +7,8 @@ struct bloomstr{
 
 typedef struct bloomstr *BloomFilter;
 
-BloomFilter bloomInitialize(unsigned int); 
+BloomFilter bloomInitialize(unsigned int);
+int bloomOR(BloomFilter, BloomFilter);
 unsigned int bloomInsert(BloomFilter, char *);
 unsigned int bloomExists(BloomFilter, char *);
 void bloomDestroy(BloomFilter);
