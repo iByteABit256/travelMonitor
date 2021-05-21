@@ -82,7 +82,7 @@ int main(int argc, char *argv[]){
     int numMonitors;
     int bufferSize;
     int sizeOfBloom;
-    char *input_dir;
+    char *input_dir = NULL;
 
     struct timespec *tspec = malloc(sizeof(struct timespec));
     tspec->tv_sec = 0;
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]){
     //nanosleep(tspec, NULL);
 
     DIR *inDir;
-    struct dirent *direntp;
+    struct dirent *direntp = NULL;
 
     Listptr subdirs = ListCreate();
 
@@ -136,6 +136,7 @@ int main(int argc, char *argv[]){
         while((direntp = readdir(inDir)) != NULL){
             //printf("inode %d -> entry %s\n", (int)direntp->d_ino, direntp->d_name);
             char *subdir = malloc(sizeof(char)*bufferSize);
+            memset(subdir, 0, sizeof(char)*bufferSize);
             strcat(subdir, input_dir);
             strcat(subdir, direntp->d_name);
             ListInsertSorted(subdirs, subdir, &compareStr);
@@ -145,11 +146,11 @@ int main(int argc, char *argv[]){
 
     //ListPrintList(subdirs);
 
-    char *current = malloc(strlen(input_dir)+1);
+    char *current = malloc(strlen(input_dir)+2);
     strcpy(current, input_dir);
     strcat(current, ".");
 
-    char *previous = malloc(strlen(input_dir)+1);
+    char *previous = malloc(strlen(input_dir)+3);
     strcpy(previous, input_dir);
     strcat(previous, "..");
 
@@ -187,13 +188,15 @@ int main(int argc, char *argv[]){
 
     for(int i = 0 ; i < numMonitors; i++){
         char buff[INITIAL_BUFFSIZE];
+        memset(buff, 0, INITIAL_BUFFSIZE);
         sprintf(buff, "%d", bufferSize);
 
-        write(fd_arr[i][0], &buff, INITIAL_BUFFSIZE);
+        write(fd_arr[i][0], buff, INITIAL_BUFFSIZE);
 
         char buff2[bufferSize];
+        memset(buff2, 0, bufferSize);
         sprintf(buff2, "%d", sizeOfBloom);
-        write(fd_arr[i][0], &buff2, bufferSize);
+        write(fd_arr[i][0], buff2, bufferSize);
     }
 
     for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
@@ -203,7 +206,11 @@ int main(int argc, char *argv[]){
             continue;
         }
 
-        write(fd_arr[count%numMonitors][0], dirname, bufferSize);
+        char buff[bufferSize];
+        memset(buff, 0, bufferSize);
+        strcpy(buff, dirname);
+
+        write(fd_arr[count%numMonitors][0], buff, bufferSize);
         // nanosleep(tspec, NULL);
 
         count++;
@@ -236,11 +243,13 @@ int main(int argc, char *argv[]){
     char *curVirus[numMonitors];
     BloomFilter tempBloom[numMonitors];
     int counter[numMonitors];
+    int missed[numMonitors];
 
     for(int i = 0; i < numMonitors; i++){
         msgNum[i] = 0;
         tempBloom[i] = bloomInitialize(sizeOfBloom);
         counter[i] = 0;
+        missed[i] = 0;
     }
 
     while(num_open_fds > 0){
@@ -256,11 +265,11 @@ int main(int argc, char *argv[]){
 
         for(int i = 0; i < nfds; i++){
             if(pfds[i].revents != 0){
-                printf("  fd=%d; events: %s%s%s%s\n", pfds[i].fd,
-                    (pfds[i].revents & POLLIN)  ? "POLLIN "  : "",
-                    (pfds[i].revents & POLLHUP) ? "POLLHUP " : "",
-                    (pfds[i].revents & POLLERR) ? "POLLERR " : "",
-                    (pfds[i].revents & POLLNVAL) ? "POLLNVAL " : "");
+                //  printf("  fd=%d; events: %s%s%s%s\n", pfds[i].fd,
+                //     (pfds[i].revents & POLLIN)  ? "POLLIN "  : "",
+                //     (pfds[i].revents & POLLHUP) ? "POLLHUP " : "",
+                //     (pfds[i].revents & POLLERR) ? "POLLERR " : "",
+                //     (pfds[i].revents & POLLNVAL) ? "POLLNVAL " : "");
 
                 if(pfds[i].revents & POLLIN){
                     //memset(buff, '\0', bufferSize);
@@ -271,12 +280,16 @@ int main(int argc, char *argv[]){
                         perror("Error in read");
                         exit(1);
                     }else if(bytes_read == 0){
+                        missed[i]++;
                         continue;
                     }
 
+                    // printf("Read %d bytes\n", bytes_read);
+
                     if(msgNum[i] == 0){
                         counter[i]++;
-                        printf("%d viruses read from fd %d\n", counter[i], pfds[i].fd);
+                        // printf("%d viruses read from fd %d\n", counter[i], pfds[i].fd);
+                        // printf("%d messages missed from fd %d\n", missed[i], pfds[i].fd);
                         char *virName = malloc((strlen(buff)+1)*sizeof(char));
                         strcpy(virName, buff);
 
@@ -302,7 +315,7 @@ int main(int argc, char *argv[]){
                     }
 
                     msgNum[i]++;
-                    printf("Message received: %s\n", buff);      
+                    // printf("Message received: %s\n", buff);      
 
                 }else{
                     if(close(pfds[i].fd)){
@@ -324,6 +337,8 @@ int main(int argc, char *argv[]){
 
     char id3[5] = "7437";
     vaccineStatusBloom(id3, HTGetItem(viruses, "SARS-1"));
+
+    vaccineStatusBloom(id, HTGetItem(viruses, "COVID-19"));
 
     return 0;
 }

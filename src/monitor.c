@@ -158,27 +158,32 @@ int main(int argc, char *argv[])
     }
 
     //popStatusByAge(HTGetItem(viruses, "COVID-19"), NULL, NULL, countries, NULL);
-    printf("%d viruses from pid %d\n", HTSize(viruses), getpid());
+    // printf("%d viruses from pid %d\n", HTSize(viruses), getpid());
 
     int count = 1;
     for(int i = 0; i < viruses->curSize; i++){
 		for(Listptr l = viruses->ht[i]->next; l != l->tail; l = l->next){
-            Virus v = l->value;
+            HTEntry ht = l->value;
+            Virus v = ht->item;
 
-            printf("%d/%d viruses\n", count, HTSize(viruses));
+            // printf("%d/%d viruses\n", count, HTSize(viruses));
 			char *buff = malloc(sizeof(char)*buffsize);
-            //memset(buff, '\0', buffsize);
+            memset(buff, 0, sizeof(char)*buffsize);
             strcpy(buff, v->name);
 
             //strcat(buff, "\n");
-            printf("Writing %s to parent\n", buff);
+            // printf("Writing %s to parent\n", buff);
             write(fd2, buff, buffsize);
-            for(int i = 0; i < bloomsize/buffsize; i++){
+            for(int i = 0; i <= bloomsize/buffsize; i++){
                 //memset(buff, '\0', buffsize);
-                memcpy(buff, v->vaccinated_bloom->bloom+i*buffsize, buffsize);
-                printf("Copied %s to buff\n", v->vaccinated_bloom->bloom+i*buffsize);
+                if(i == bloomsize/buffsize){
+                    memcpy(buff, v->vaccinated_bloom->bloom+i*buffsize, bloomsize%buffsize);
+                }else{
+                    memcpy(buff, v->vaccinated_bloom->bloom+i*buffsize, buffsize);
+                }
+                // printf("Copied %s to buff\n", v->vaccinated_bloom->bloom+i*buffsize);
                 //strcat(buff, "\n");
-                printf("Writing %s to parent\n", buff);
+                // printf("Writing %s to parent\n", buff);
                 write(fd2, buff, buffsize);
             }
             free(buff);
