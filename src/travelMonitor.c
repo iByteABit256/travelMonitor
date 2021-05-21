@@ -85,23 +85,23 @@ int main(int argc, char *argv[]){
     char *input_dir = NULL;
 
     parseExecutableParameters(argc, argv, &numMonitors, &bufferSize, &sizeOfBloom, &input_dir);
-
-    //printf("numMonitors: %d\nbufferSize: %d\nsizeOfBloom: %d\ninput_dir: %s\n", numMonitors, bufferSize, sizeOfBloom, input_dir);
   
     // FIFO file path
     char *myfifo = "./tmp/";
   
     for(int i = 0; i < numMonitors; i++){
-        // Creating the named file(FIFO)
-        // mkfifo(<pathname>, <permission>)
+
+        // Creating the named pipes
         char temp[20];
         strncpy(temp, myfifo, 20);
 
+        // Parent to child
         char str[20];
         sprintf(str, "%dv", i);
         
         mkfifo(strncat(temp, str, 20), 0666);
 
+        // Child to parent
         char temp2[20];
         strcpy(temp2, temp);
         temp2[strlen(temp)-1] = '^';
@@ -109,28 +109,28 @@ int main(int argc, char *argv[]){
         mkfifo(temp2, 0666);
 
         pid_t pid = fork();
+
         if(pid == -1){
+            // Error
             fprintf(stderr, "Error during fork\n");
             exit(1);
         }else if(pid == 0){
-            //printf("I am child %u\n", getpid());
+            // Forked process
             execl("./monitor", "./monitor", temp, temp2, (char *)NULL);
             exit(1);
         }
     }
-
-    //nanosleep(tspec, NULL);
 
     DIR *inDir;
     struct dirent *direntp = NULL;
 
     Listptr subdirs = ListCreate();
 
+    // Traverse input directory and add subdirectory names to list
     if((inDir = opendir(input_dir)) == NULL){
         fprintf(stderr, "Could not open %s\n", input_dir);
     }else{
         while((direntp = readdir(inDir)) != NULL){
-            //printf("inode %d -> entry %s\n", (int)direntp->d_ino, direntp->d_name);
             char *subdir = malloc(sizeof(char)*bufferSize);
             memset(subdir, 0, sizeof(char)*bufferSize);
             strcat(subdir, input_dir);
@@ -140,8 +140,6 @@ int main(int argc, char *argv[]){
         closedir(inDir);
     }
 
-    //ListPrintList(subdirs);
-
     char *current = malloc(strlen(input_dir)+2);
     strcpy(current, input_dir);
     strcat(current, ".");
@@ -150,18 +148,7 @@ int main(int argc, char *argv[]){
     strcpy(previous, input_dir);
     strcat(previous, "..");
 
-    // for(int i = 0; i < numMonitors; i++){
-    //     char temp[20];
-    //     strncpy(temp, myfifo, 20);
-
-    //     char str[20];
-    //     sprintf(str, "%d", i);
-
-    //     fd = open(temp, O_WRONLY);
-    //     write(fd, &sizeOfBloom, sizeof(int));
-    //     write(fd, &bufferSize, sizeof(int));
-    //     close(fd);
-    // }
+    // File descriptor array for both directions
     int fd_arr[numMonitors][2];
 
     for(int i = 0; i < numMonitors; i++){
@@ -180,8 +167,7 @@ int main(int argc, char *argv[]){
         fd_arr[i][1] = open(temp, O_RDONLY);
     }
 
-    int count = 0;
-
+    // Pass buffsize and bloomsize to children
     for(int i = 0 ; i < numMonitors; i++){
         char buff[INITIAL_BUFFSIZE];
         memset(buff, 0, INITIAL_BUFFSIZE);
@@ -195,6 +181,10 @@ int main(int argc, char *argv[]){
         write(fd_arr[i][0], buff2, bufferSize);
     }
 
+
+    // Pass subdirectories to children with round robin order
+
+    int count = 0;
     for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
         char *dirname = l->value;
 
@@ -207,7 +197,6 @@ int main(int argc, char *argv[]){
         strcpy(buff, dirname);
 
         write(fd_arr[count%numMonitors][0], buff, bufferSize);
-        // nanosleep(tspec, NULL);
 
         count++;
     }
@@ -216,13 +205,11 @@ int main(int argc, char *argv[]){
         free(l->value);
     }
     ListDestroy(subdirs);
-    //free(subdirs);
     free(current);
     free(previous);
 
     for(int i = 0; i < numMonitors; i++){
         close(fd_arr[i][0]);
-        //close(fd_arr[i][1]);
     }
 
     struct pollfd *pfds;
@@ -246,19 +233,14 @@ int main(int argc, char *argv[]){
     int msgNum[numMonitors];
     char *curVirus[numMonitors];
     BloomFilter tempBloom[numMonitors];
-    // int counter[numMonitors];
-    // int missed[numMonitors];
 
     for(int i = 0; i < numMonitors; i++){
         msgNum[i] = 0;
         tempBloom[i] = bloomInitialize(sizeOfBloom);
-        // counter[i] = 0;
-        // missed[i] = 0;
     }
 
     while(num_open_fds > 0){
         char buff[bufferSize];
-        //memset(buff, '\0', bufferSize);
 
         int ready = poll(pfds, nfds, -1);
 
@@ -267,16 +249,11 @@ int main(int argc, char *argv[]){
             exit(1);
         }
 
+        // Read pipe input from every child still running
         for(int i = 0; i < nfds; i++){
             if(pfds[i].revents != 0){
-                //  printf("  fd=%d; events: %s%s%s%s\n", pfds[i].fd,
-                //     (pfds[i].revents & POLLIN)  ? "POLLIN "  : "",
-                //     (pfds[i].revents & POLLHUP) ? "POLLHUP " : "",
-                //     (pfds[i].revents & POLLERR) ? "POLLERR " : "",
-                //     (pfds[i].revents & POLLNVAL) ? "POLLNVAL " : "");
 
                 if(pfds[i].revents & POLLIN){
-                    //memset(buff, '\0', bufferSize);
 
                     int bytes_read = read(pfds[i].fd, buff, bufferSize);
 
@@ -284,16 +261,12 @@ int main(int argc, char *argv[]){
                         perror("Error in read");
                         exit(1);
                     }else if(bytes_read == 0){
-                        //missed[i]++;
                         continue;
                     }
 
-                    // printf("Read %d bytes\n", bytes_read);
-
+                    // First message is virus name
                     if(msgNum[i] == 0){
-                        //counter[i]++;
-                        // printf("%d viruses read from fd %d\n", counter[i], pfds[i].fd);
-                        // printf("%d messages missed from fd %d\n", missed[i], pfds[i].fd);
+
                         char *virName = malloc((strlen(buff)+1)*sizeof(char));
                         strcpy(virName, buff);
 
@@ -303,9 +276,13 @@ int main(int argc, char *argv[]){
                             Virus vir = newVirus(virName, sizeOfBloom, 9, 0.5);
                             HTInsert(viruses, virName, vir);
                         }
-                    }else if(msgNum[i]-1 < sizeOfBloom/bufferSize){         
+                    }else if(msgNum[i]-1 < sizeOfBloom/bufferSize){   
+                        // Bloomfilter parts copied to temporary bloomfilter
+
                         memcpy(tempBloom[i]->bloom+(msgNum[i]-1)*bufferSize, buff, bufferSize);
                     }else{
+                        // Temporary bloomfilter acts as a mask on the actual bloomfilter
+
                         Virus vir = HTGetItem(viruses, curVirus[i]);
                         BloomFilter bF = vir->vaccinated_bloom;
                         bloomOR(bF, tempBloom[i]);
@@ -319,13 +296,12 @@ int main(int argc, char *argv[]){
                         continue;
                     }
 
-                    msgNum[i]++;
-                    // printf("Message received: %s\n", buff);      
+                    msgNum[i]++;   
 
                 }else{
                     if(close(pfds[i].fd)){
                         perror("close error\n");
-                        //exit(1);
+                        exit(1);
                     }
                     pfds[i].fd = -1; //Ignore events on next call
                     num_open_fds--;
@@ -344,6 +320,8 @@ int main(int argc, char *argv[]){
     vaccineStatusBloom(id3, HTGetItem(viruses, "SARS-1"));
 
     vaccineStatusBloom(id, HTGetItem(viruses, "COVID-19"));
+
+    // Memory freeing
 
     for(int i = 0; i < viruses->curSize; i++){
 		for(Listptr l = viruses->ht[i]->next; l != l->tail; l = l->next){

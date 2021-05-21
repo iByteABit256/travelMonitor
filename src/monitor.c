@@ -83,30 +83,15 @@ int main(int argc, char *argv[])
     int fd, fd2;
     int bloomsize = 69;
     int buffsize = INITIAL_BUFFSIZE;
-  
-    // FIFO file path
-    //char * myfifo = "/tmp/myfifo";
-  
-    // Creating the named file(FIFO)
-    // mkfifo(<pathname>,<permission>)
-    //mkfifo(myfifo, 0666);
 
     char *pipename = argv[1];
     char *pipename2 = argv[2];
     char *buff = malloc(sizeof(char)*buffsize);
 
-    //printf("Opening %s\n", pipename);
-    
-    // char EOT[20] = "Hello!";
-
     Listptr countryPaths = ListCreate();
 
     fd = open(pipename, O_RDONLY);
     fd2 = open(pipename2, O_WRONLY);
-
-    // struct timespec *tspec = malloc(sizeof(struct timespec));
-    // tspec->tv_sec = 0;
-    // tspec->tv_nsec = 2000000;
 
     struct pollfd *pfds;
     int num_open_fds, nfds;
@@ -122,15 +107,9 @@ int main(int argc, char *argv[])
     pfds[0].fd = fd;
     pfds[0].events = POLLIN;
 
-    //nanosleep(tspec, NULL);
-
-    // read(fd, &bloomsize, sizeof(int));
-    // read(fd, &buffsize, sizeof(int));
-
-    // printf("bloomsize = %d\nbuffsize = %d\n", bloomsize, buffsize);
+    // Read buffersize, bloomsize and subdirectory paths from parent
 
     int msgNum = 0;
-
     while(num_open_fds > 0){
         int ready = poll(pfds, nfds, -1);
 
@@ -142,9 +121,7 @@ int main(int argc, char *argv[])
         if(pfds[0].revents != 0){
             if(pfds[0].revents & POLLIN){
 
-                //printf("buf1 = %s\n", buff);
                 int bytes_read = read(fd, buff, buffsize);
-                //printf("buf2 = %s\n", buff);
 
                 if(bytes_read == -1){
                     perror("Error in read");
@@ -153,16 +130,17 @@ int main(int argc, char *argv[])
                     continue;
                 }
 
-                //printf("msgnum = %d, buff = %s\n", msgNum, buff);
-
                 if(msgNum == 0){
+                    // First message
+
                     buffsize = atoi(buff);
-                    //printf("buffsize = %d\n", buffsize);
                 }else if(msgNum == 1){
+                    // Second message
+
                     bloomsize = atoi(buff);
-                    //printf("bloomsize = %d\n", bloomsize);
                 }else{
-                    //printf("Process %u: Subdirectory %s\n", getpid(), buff);
+                    // Subdirectory path
+
                     char *country = malloc(strlen(buff)+1);
                     strcpy(country, buff);
                     ListInsertLast(countryPaths, country);
@@ -180,18 +158,16 @@ int main(int argc, char *argv[])
         }
     }
 
-    //printf("Process %u: Subdirectories:\n", getpid());
-    //ListPrintList(countryPaths);
-
     DIR *subdir;
     struct dirent *direntp;
+
+    // Traverse subdirectories and save file paths in list
 
     Listptr filepaths = ListCreate();
 
     for(Listptr l = countryPaths->head->next; l != l->tail; l = l->next){
         char *subdirName = l->value;
 
-        //printf("subdirName = %s\n", subdirName);
         if((subdir = opendir(subdirName)) == NULL){
             fprintf(stderr, "Could not open %s\n", subdirName);
         }else{     
@@ -211,11 +187,12 @@ int main(int argc, char *argv[])
 
     ListDestroy(countryPaths);
 
-    //ListPrintList(filepaths);
     HTHash viruses = HTCreate();
     HTHash persons = HTCreate();
     HTHash countries = HTCreate();
     
+    // Parse files
+
     for(Listptr l = filepaths->head->next; l != l->tail; l = l->next){
         char *filepath = l->value;
 
@@ -226,8 +203,9 @@ int main(int argc, char *argv[])
 
     ListDestroy(filepaths);
 
-    //popStatusByAge(HTGetItem(viruses, "COVID-19"), NULL, NULL, countries, NULL);
-    // printf("%d viruses from pid %d\n", HTSize(viruses), getpid());
+    // Send bloomfilters to parent
+        // -First message is virus name
+        // -Following messages are bloomfilter parts
 
     int count = 1;
     for(int i = 0; i < viruses->curSize; i++){
@@ -235,24 +213,19 @@ int main(int argc, char *argv[])
             HTEntry ht = l->value;
             Virus v = ht->item;
 
-            // printf("%d/%d viruses\n", count, HTSize(viruses));
 			char *buff = malloc(sizeof(char)*buffsize);
             memset(buff, 0, sizeof(char)*buffsize);
             strcpy(buff, v->name);
 
-            //strcat(buff, "\n");
-            // printf("Writing %s to parent\n", buff);
             write(fd2, buff, buffsize);
             for(int i = 0; i <= bloomsize/buffsize; i++){
-                //memset(buff, '\0', buffsize);
                 if(i == bloomsize/buffsize){
+                    // Remaining part of bloomfilter
+
                     memcpy(buff, v->vaccinated_bloom->bloom+i*buffsize, bloomsize%buffsize);
                 }else{
                     memcpy(buff, v->vaccinated_bloom->bloom+i*buffsize, buffsize);
                 }
-                // printf("Copied %s to buff\n", v->vaccinated_bloom->bloom+i*buffsize);
-                //strcat(buff, "\n");
-                // printf("Writing %s to parent\n", buff);
                 write(fd2, buff, buffsize);
             }
             free(buff);
@@ -260,9 +233,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
+    // Memory freeing
+
     freeMemory(countries, viruses, persons);
 
-    //close(fd2);
     free(buff);
     free(pfds);
 
