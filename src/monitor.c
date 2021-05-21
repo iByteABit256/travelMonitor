@@ -233,6 +233,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
+    if(close(fd2)){
+        perror("close error\n");
+        exit(1);
+    }
+
     // Memory freeing
 
     freeMemory(countries, viruses, persons);
