@@ -84,10 +84,6 @@ int main(int argc, char *argv[]){
     int sizeOfBloom;
     char *input_dir = NULL;
 
-    struct timespec *tspec = malloc(sizeof(struct timespec));
-    tspec->tv_sec = 0;
-    tspec->tv_nsec = 2000000;
-
     parseExecutableParameters(argc, argv, &numMonitors, &bufferSize, &sizeOfBloom, &input_dir);
 
     //printf("numMonitors: %d\nbufferSize: %d\nsizeOfBloom: %d\ninput_dir: %s\n", numMonitors, bufferSize, sizeOfBloom, input_dir);
@@ -170,7 +166,7 @@ int main(int argc, char *argv[]){
 
     for(int i = 0; i < numMonitors; i++){
         char temp[20];
-        strncpy(temp, myfifo, 20);
+        strncpy(temp, myfifo, strlen(myfifo)+1);
 
         char postfix[20] = "";
         sprintf(postfix, "%dv", i);
@@ -216,6 +212,14 @@ int main(int argc, char *argv[]){
         count++;
     }
 
+    for(Listptr l = subdirs->head->next; l != l->tail; l = l->next){
+        free(l->value);
+    }
+    ListDestroy(subdirs);
+    //free(subdirs);
+    free(current);
+    free(previous);
+
     for(int i = 0; i < numMonitors; i++){
         close(fd_arr[i][0]);
         //close(fd_arr[i][1]);
@@ -242,14 +246,14 @@ int main(int argc, char *argv[]){
     int msgNum[numMonitors];
     char *curVirus[numMonitors];
     BloomFilter tempBloom[numMonitors];
-    int counter[numMonitors];
-    int missed[numMonitors];
+    // int counter[numMonitors];
+    // int missed[numMonitors];
 
     for(int i = 0; i < numMonitors; i++){
         msgNum[i] = 0;
         tempBloom[i] = bloomInitialize(sizeOfBloom);
-        counter[i] = 0;
-        missed[i] = 0;
+        // counter[i] = 0;
+        // missed[i] = 0;
     }
 
     while(num_open_fds > 0){
@@ -280,14 +284,14 @@ int main(int argc, char *argv[]){
                         perror("Error in read");
                         exit(1);
                     }else if(bytes_read == 0){
-                        missed[i]++;
+                        //missed[i]++;
                         continue;
                     }
 
                     // printf("Read %d bytes\n", bytes_read);
 
                     if(msgNum[i] == 0){
-                        counter[i]++;
+                        //counter[i]++;
                         // printf("%d viruses read from fd %d\n", counter[i], pfds[i].fd);
                         // printf("%d messages missed from fd %d\n", missed[i], pfds[i].fd);
                         char *virName = malloc((strlen(buff)+1)*sizeof(char));
@@ -309,6 +313,7 @@ int main(int argc, char *argv[]){
                         msgNum[i] = 0;
                         curVirus[i] = NULL;
                         bloomDestroy(tempBloom[i]);
+                        free(tempBloom[i]);
                         tempBloom[i] = bloomInitialize(sizeOfBloom);
 
                         continue;
@@ -328,7 +333,7 @@ int main(int argc, char *argv[]){
             }
         }
     }
-
+    
     char id[5] = "5510";
     vaccineStatusBloom(id, HTGetItem(viruses, "COWPOX"));
 
@@ -339,6 +344,24 @@ int main(int argc, char *argv[]){
     vaccineStatusBloom(id3, HTGetItem(viruses, "SARS-1"));
 
     vaccineStatusBloom(id, HTGetItem(viruses, "COVID-19"));
+
+    for(int i = 0; i < viruses->curSize; i++){
+		for(Listptr l = viruses->ht[i]->next; l != l->tail; l = l->next){
+            HTEntry ht = l->value;
+            free(ht->key);
+            Virus v = ht->item;
+            destroyVirus(v);
+            free(v);
+        }
+    }
+
+    HTDestroy(viruses);
+    free(pfds);
+    
+    for(int i = 0; i < numMonitors; i++){
+        bloomDestroy(tempBloom[i]);
+        free(tempBloom[i]);
+    }
 
     return 0;
 }

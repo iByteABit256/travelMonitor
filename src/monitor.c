@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
         }else{     
             while((direntp = readdir(subdir)) != NULL){
                 if(strcmp(direntp->d_name, ".") && strcmp(direntp->d_name, "..")){
-                    char *temp = malloc(buffsize);
+                    char *temp = malloc(buffsize*10);
                     strcpy(temp, subdirName);
                     strcat(temp, "/");
                     strcat(temp, direntp->d_name);

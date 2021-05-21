@@ -15,6 +15,7 @@ struct virusstr{
 typedef struct virusstr *Virus;
 
 Virus newVirus(char *, int, int, float);
+void destroyVirus(Virus);
 
 // Country
 struct countrystr{

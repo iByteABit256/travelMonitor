@@ -32,6 +32,17 @@ Virus newVirus(char *name, int bloomSize, int maxlvl, float tossChance){
     return vir;
 }
 
+// Destroy virus
+void destroyVirus(Virus v){
+    free(v->name);
+    bloomDestroy(v->vaccinated_bloom);
+    free(v->vaccinated_bloom);
+    skipDestroy(v->vaccinated_persons);
+    free(v->vaccinated_persons);
+    skipDestroy(v->not_vaccinated_persons);
+    free(v->not_vaccinated_persons);
+}
+
 // Increments correct age group population
 void incrementAgePopulation(Country country, int age){
     country->agePopulation[MIN(age/20, 3)] += 1;
