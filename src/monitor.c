@@ -238,6 +238,72 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    fd = open(pipename, O_RDONLY);
+    //fd2 = open(pipename2, O_WRONLY);
+
+    while(1){
+        char buff[buffsize];
+        int bytes_read = read(fd, buff, buffsize);
+
+        if(bytes_read > 0){
+            printf("Received: %s\n", buff);
+
+            if(!strcmp(buff, "travelRequest")){
+                bytes_read = read(fd, buff, buffsize);
+
+                char *id = malloc(strlen(buff)+1);
+                strcpy(id, buff);
+
+                bytes_read = read(fd, buff, buffsize);
+
+                char *virName = malloc(strlen(buff)+1);
+                strcpy(virName, buff);
+
+                printf("Received %s and %s\n", id, virName);
+
+                Virus v = HTGetItem(viruses, virName);
+
+                VaccRecord rec = skipGet(v->vaccinated_persons, id);
+
+                if(rec){
+                    //printf("VACCINATED ON %02d-%02d-%04d\n\n", rec->date->day, rec->date->month, rec->date->year);
+                    close(fd);
+                    fd2 = open(pipename2, O_WRONLY);
+                    strcpy(buff, "YES");
+                    write(fd2, buff, buffsize);
+                    strcpy(buff, "");
+                    sprintf(buff, "%d", rec->date->day);
+                    write(fd2, buff, buffsize);
+                    strcpy(buff, "");
+                    sprintf(buff, "%d", rec->date->month);
+                    write(fd2, buff, buffsize);
+                    strcpy(buff, "");
+                    sprintf(buff, "%d", rec->date->year);
+                    write(fd2, buff, buffsize);
+                    close(fd2);
+                    fd = open(pipename, O_RDONLY);
+                }else{
+                    //printf("NOT VACCINATED\n\n");
+                    strcpy(buff, "NO");
+                    write(fd2, buff, buffsize);
+                }
+            }
+            if(!strcmp(buff, "exit")){
+                break;
+            }
+        }
+    }
+
+    if(close(fd)){
+        perror("close error");
+        exit(1);
+    }
+
+    if(close(fd2)){
+        perror("close error");
+        exit(1);
+    }
+
     // Memory freeing
 
     freeMemory(countries, viruses, persons);
