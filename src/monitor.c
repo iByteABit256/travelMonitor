@@ -246,7 +246,7 @@ int main(int argc, char *argv[])
         int bytes_read = read(fd, buff, buffsize);
 
         if(bytes_read > 0){
-            printf("Received: %s\n", buff);
+            //printf("Received: %s\n", buff);
 
             if(!strcmp(buff, "travelRequest")){
                 bytes_read = read(fd, buff, buffsize);
@@ -259,7 +259,7 @@ int main(int argc, char *argv[])
                 char *virName = malloc(strlen(buff)+1);
                 strcpy(virName, buff);
 
-                printf("Received %s and %s\n", id, virName);
+                //printf("Received %s and %s\n", id, virName);
 
                 Virus v = HTGetItem(viruses, virName);
 
@@ -284,8 +284,12 @@ int main(int argc, char *argv[])
                     fd = open(pipename, O_RDONLY);
                 }else{
                     //printf("NOT VACCINATED\n\n");
+                    close(fd);
+                    fd2 = open(pipename2, O_WRONLY);
                     strcpy(buff, "NO");
                     write(fd2, buff, buffsize);
+                    close(fd2);
+                    fd = open(pipename, O_RDONLY);
                 }
             }
             if(!strcmp(buff, "exit")){
@@ -295,13 +299,13 @@ int main(int argc, char *argv[])
     }
 
     if(close(fd)){
-        perror("close error");
-        exit(1);
+        // perror("close error");
+        // exit(1);
     }
 
     if(close(fd2)){
-        perror("close error");
-        exit(1);
+        // perror("close error");
+        // exit(1);
     }
 
     // Memory freeing

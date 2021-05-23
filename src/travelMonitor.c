@@ -166,6 +166,7 @@ int main(int argc, char *argv[]){
 
     // File descriptor array for both directions
     int fd_arr[numMonitors][2];
+    char *pipesNames[numMonitors][2];
 
     for(int i = 0; i < numMonitors; i++){
         char temp[20];
@@ -177,10 +178,16 @@ int main(int argc, char *argv[]){
         strcat(temp, postfix);
 
         fd_arr[i][0] = open(temp, O_WRONLY);
+        char *pipename = malloc(strlen(temp)+1);
+        strcpy(pipename, temp);
+        pipesNames[i][0] = pipename;
 
         temp[strlen(temp)-1] = '^';
 
         fd_arr[i][1] = open(temp, O_RDONLY);
+        char *pipename2 = malloc(strlen(temp)+1);
+        strcpy(pipename2, temp);
+        pipesNames[i][1] = pipename2;
     }
 
     // Pass buffsize and bloomsize to children
@@ -434,16 +441,11 @@ int main(int argc, char *argv[]){
 
                 if(bloomExists(v->vaccinated_bloom, id)){
                     int mon = getMonitorNum(numMonitors, countries, countryFrom);
-                    char temp[20];
-                    strncpy(temp, myfifo, strlen(myfifo)+1);
 
-                    char postfix[20] = "";
-                    sprintf(postfix, "%dv", mon);
-
-                    strcat(temp, postfix);
-                    fd_arr[mon][0] = open(temp, O_WRONLY);
+                    fd_arr[mon][0] = open(pipesNames[mon][0], O_WRONLY);
 
                     char buff[bufferSize];
+                    memset(buff, 0, bufferSize);
                     strcpy(buff, "travelRequest");
 
                     write(fd_arr[mon][0], buff, bufferSize);
@@ -461,6 +463,8 @@ int main(int argc, char *argv[]){
                         exit(1);
                     }
 
+                    fd_arr[mon][1] = open(pipesNames[mon][1], O_RDONLY);
+
                     read(fd_arr[mon][1], buff, bufferSize);
 
                     if(!strcmp(buff, "YES")){
@@ -471,10 +475,20 @@ int main(int argc, char *argv[]){
                         vacc_date->month = atoi(buff);
                         read(fd_arr[mon][1], buff, bufferSize);
                         vacc_date->year = atoi(buff);
-                        printf("VACCINATED ON %02d-%02d-%04d\n\n", vacc_date->day, vacc_date->month, vacc_date->year);
+
+                        if(getDiffDate(date, vacc_date)/30 >= 6){
+                            printf("REQUEST REJECTED – YOU WILL NEED ANOTHER VACCINATION BEFORE TRAVEL DATE\n\n");
+                        }else{
+                            printf("REQUEST ACCEPTED – HAPPY TRAVELS\n\n");
+                        }
+
                     }else if(!strcmp(buff, "NO")){
-                        printf("NOT VACCINATED\n\n");
+                        printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n\n");
                     }
+
+                    close(fd_arr[mon][1]);
+
+                    fd_arr[mon][0] = open(pipesNames[mon][0], O_WRONLY);
 
                 }else{
                     printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n\n");
@@ -483,14 +497,7 @@ int main(int argc, char *argv[]){
 
             if(!strcmp(token, "/exit")){
                 for(int i = 0; i < numMonitors; i++){
-                    char temp[20];
-                    strncpy(temp, myfifo, strlen(myfifo)+1);
-
-                    char postfix[20] = "";
-                    sprintf(postfix, "%dv", i);
-
-                    strcat(temp, postfix);
-                    fd_arr[i][0] = open(temp, O_WRONLY);
+                    fd_arr[i][0] = open(pipesNames[i][0], O_WRONLY);
 
                     write(fd_arr[i][0], "exit", 5);
 
@@ -532,6 +539,8 @@ int main(int argc, char *argv[]){
     free(pfds);
     
     for(int i = 0; i < numMonitors; i++){
+        free(pipesNames[i][0]);
+        free(pipesNames[i][1]);
         bloomDestroy(tempBloom[i]);
         free(tempBloom[i]);
     }

@@ -7,3 +7,4 @@ struct datestr{
 typedef struct datestr *Date;
 
 int compareDates(Date, Date);
+int getDiffDate(Date, Date);

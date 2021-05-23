@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include "date.h"
 
+#define ABS(a) a >= 0? a : -a
+
 // d1 > d2  ->  1
 // d1 == d2 ->  0
 // d1 < d2  -> -1
@@ -25,4 +27,11 @@ int compareDates(Date d1, Date d2){
     }
 
     return 0;
+}
+
+// Difference of two dates in days
+int getDiffDate(Date d1, Date d2){
+    int days1 = d1->day + d1->month*30 + d1->year*365;
+    int days2 = d2->day + d2->month*30 + d2->year*365;
+    return ABS(days1-days2);
 }
