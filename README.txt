@@ -97,7 +97,7 @@ exits after releasing all of its allocated memory.
 
 When receiving one of the forementioned signals,
 the monitors generate a log file, or append to
-and already existing one, and then continue
+an already existing one, and then continue
 running.
 
 Note:
