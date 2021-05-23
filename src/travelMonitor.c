@@ -217,6 +217,7 @@ int main(int argc, char *argv[]){
         strcpy(dirname, l->value);
 
         if(!strcmp(dirname, current) || !strcmp(dirname, previous)){
+            free(dirname);
             continue;
         }
 
@@ -224,13 +225,19 @@ int main(int argc, char *argv[]){
         memset(buff, 0, bufferSize);
         strcpy(buff, dirname);
 
+        char *temp = dirname;
         char *prev = dirname;
         dirname = strtok(dirname, "/");
         while(dirname != NULL){
             prev = dirname;
             dirname = strtok(NULL, "/");
         }
-        HTInsert(countries[count%numMonitors], prev, prev);
+
+        char *country = malloc(strlen(prev)+1);
+        strcpy(country, prev);
+        free(temp);
+
+        HTInsert(countries[count%numMonitors], country, country);
         write(fd_arr[count%numMonitors][0], buff, bufferSize);
 
         count++;
@@ -252,7 +259,7 @@ int main(int argc, char *argv[]){
 
     num_open_fds = nfds = numMonitors;
 
-    pfds = calloc(nfds, sizeof(struct pollfd));    
+    pfds = calloc(nfds, sizeof(struct pollfd));   
     if(pfds == NULL){
         perror("calloc error\n");
         exit(1);
@@ -305,12 +312,16 @@ int main(int argc, char *argv[]){
                         char *virName = malloc((strlen(buff)+1)*sizeof(char));
                         strcpy(virName, buff);
 
-                        curVirus[i] = virName;
+                        curVirus[i] = malloc(strlen(virName)+1);
+                        strcpy(curVirus[i], virName);
 
                         if(!HTExists(viruses, virName)){
                             Virus vir = newVirus(virName, sizeOfBloom, 9, 0.5);
-                            HTInsert(viruses, virName, vir);
+                            HTInsert(viruses, vir->name, vir);
                         }
+
+                        free(virName);
+                    
                     }else if(msgNum[i]-1 < sizeOfBloom/bufferSize){   
                         // Bloomfilter parts copied to temporary bloomfilter
 
@@ -323,6 +334,7 @@ int main(int argc, char *argv[]){
                         bloomOR(bF, tempBloom[i]);
 
                         msgNum[i] = 0;
+                        free(curVirus[i]);
                         curVirus[i] = NULL;
                         bloomDestroy(tempBloom[i]);
                         free(tempBloom[i]);
@@ -482,6 +494,8 @@ int main(int argc, char *argv[]){
                             printf("REQUEST ACCEPTED – HAPPY TRAVELS\n\n");
                         }
 
+                        free(vacc_date);
+
                     }else if(!strcmp(buff, "NO")){
                         printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n\n");
                     }
@@ -492,7 +506,8 @@ int main(int argc, char *argv[]){
 
                 }else{
                     printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n\n");
-                } 
+                }
+                free(date);
             }
 
             if(!strcmp(token, "/exit")){
@@ -525,10 +540,12 @@ int main(int argc, char *argv[]){
 
     // Memory freeing
 
+    free(inbuf);
+
     for(int i = 0; i < viruses->curSize; i++){
 		for(Listptr l = viruses->ht[i]->next; l != l->tail; l = l->next){
             HTEntry ht = l->value;
-            free(ht->key);
+            //free(ht->key);
             Virus v = ht->item;
             destroyVirus(v);
             free(v);
@@ -539,6 +556,14 @@ int main(int argc, char *argv[]){
     free(pfds);
     
     for(int i = 0; i < numMonitors; i++){
+        HTHash ht = countries[i];
+        for(int i = 0; i < ht->curSize; i++){
+            for(Listptr l = ht->ht[i]->next; l != l->tail; l = l->next){
+                HTEntry ht = l->value;
+                free(ht->item);   
+            }
+        }
+        HTDestroy(ht);
         free(pipesNames[i][0]);
         free(pipesNames[i][1]);
         bloomDestroy(tempBloom[i]);

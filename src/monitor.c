@@ -291,6 +291,9 @@ int main(int argc, char *argv[])
                     close(fd2);
                     fd = open(pipename, O_RDONLY);
                 }
+
+                free(id);
+                free(virName);
             }
             if(!strcmp(buff, "exit")){
                 break;
