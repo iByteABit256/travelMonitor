@@ -8,6 +8,7 @@
 #include <time.h>
 #include <dirent.h>
 #include <poll.h>
+#include <signal.h>
 #include "../lib/lists/lists.h"
 #include "../lib/bloomfilter/bloomfilter.h"
 #include "../lib/hashtable/htInterface.h"
@@ -15,6 +16,45 @@
 #include "../src/vaccineMonitor.h"
 
 #define INITIAL_BUFFSIZE 100
+
+int received_signal = 0;
+
+// Signal handler
+void my_handler(int signo, siginfo_t *info, void *context){
+    received_signal = 1;
+}
+
+// Parent's response to incoming SIGINT/SIGQUIT signals
+void signalResponse(char *logPath, int travelRequests, int accepted, int rejected, HTHash countries){
+
+    char extension[10];
+    sprintf(extension, "%d", getpid());
+
+    char *logFile = malloc(strlen(logPath)+11);
+    strcpy(logFile, logPath);
+    strcat(logFile, extension);
+
+    FILE *log = fopen(logFile, "a");
+
+    free(logFile);
+
+    
+    for(int i = 0; i < countries->curSize; i++){
+        for(Listptr l = countries->ht[i]->next; l != l->tail; l = l->next){
+            HTEntry ht = l->value;
+            fprintf(log, "%s\n", ht->key); 
+        }
+    }
+
+    fprintf(log, "TOTAL TRAVEL REQUESTS %d\n", travelRequests);
+    fprintf(log, "ACCEPTED %d\n", accepted);
+    fprintf(log, "REJECTED %d\n", rejected);
+
+    fclose(log);
+
+    // Reset flag
+    received_signal = 0;
+}
 
 // Frees up remaining memory after exiting
 void freeMemory(HTHash countries, HTHash viruses, HTHash citizenRecords){
@@ -78,10 +118,19 @@ void freeMemory(HTHash countries, HTHash viruses, HTHash citizenRecords){
     HTDestroy(viruses);
 }
   
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
+
+    struct sigaction act;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = SA_SIGINFO;
+    act.sa_sigaction = my_handler;
+    sigaction(SIGQUIT, &act, 0);
+    sigaction(SIGINT, &act, 0);
+
+    char *logPath = "./logs/log_file.";
+
     int fd, fd2;
-    int bloomsize = 69;
+    int bloomsize;
     int buffsize = INITIAL_BUFFSIZE;
 
     char *pipename = argv[1];
@@ -239,16 +288,24 @@ int main(int argc, char *argv[])
     }
 
     fd = open(pipename, O_RDONLY);
-    //fd2 = open(pipename2, O_WRONLY);
+
+    int totalRequests = 0;
+    int accepted = 0;
+    int rejected = 0;
 
     while(1){
         char buff[buffsize];
         int bytes_read = read(fd, buff, buffsize);
 
+        if(received_signal){
+            signalResponse(logPath, totalRequests, accepted, rejected, countries);
+        }
+
         if(bytes_read > 0){
-            //printf("Received: %s\n", buff);
 
             if(!strcmp(buff, "travelRequest")){
+                totalRequests++;
+
                 bytes_read = read(fd, buff, buffsize);
 
                 char *id = malloc(strlen(buff)+1);
@@ -259,14 +316,12 @@ int main(int argc, char *argv[])
                 char *virName = malloc(strlen(buff)+1);
                 strcpy(virName, buff);
 
-                //printf("Received %s and %s\n", id, virName);
-
                 Virus v = HTGetItem(viruses, virName);
 
                 VaccRecord rec = skipGet(v->vaccinated_persons, id);
 
                 if(rec){
-                    //printf("VACCINATED ON %02d-%02d-%04d\n\n", rec->date->day, rec->date->month, rec->date->year);
+                    accepted++;
                     close(fd);
                     fd2 = open(pipename2, O_WRONLY);
                     strcpy(buff, "YES");
@@ -283,7 +338,7 @@ int main(int argc, char *argv[])
                     close(fd2);
                     fd = open(pipename, O_RDONLY);
                 }else{
-                    //printf("NOT VACCINATED\n\n");
+                    rejected++;
                     close(fd);
                     fd2 = open(pipename2, O_WRONLY);
                     strcpy(buff, "NO");
@@ -301,15 +356,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    if(close(fd)){
-        // perror("close error");
-        // exit(1);
-    }
+    // Close file descriptors
 
-    if(close(fd2)){
-        // perror("close error");
-        // exit(1);
-    }
+    close(fd);
+    close(fd2);
 
     // Memory freeing
 

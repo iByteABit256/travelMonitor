@@ -1,3 +1,4 @@
+#include <bits/types/siginfo_t.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +9,8 @@
 #include <dirent.h>
 #include <time.h>
 #include <poll.h>
+#include <signal.h>
+#include <wait.h>
 #include "../src/vaccineMonitor.h"
 #include "../lib/lists/lists.h"
 #include "../lib/bloomfilter/bloomfilter.h"
@@ -15,6 +18,53 @@
 
 #define INITIAL_BUFFSIZE 100
 #define MAX_LINE 100
+
+int received_signal = 0;
+
+// Signal handler
+void my_handler(int signo, siginfo_t *info, void *context){
+    received_signal = 1;
+}
+
+// Parent's response to incoming SIGINT/SIGQUIT signals
+void signalResponse(int numMonitors, pid_t *pids, char *logPath, int travelRequests, int accepted, int rejected, HTHash *countries){
+    for(int i = 0 ; i < numMonitors; i++){
+        int status;
+
+        union sigval sigv;
+        sigv.sival_int = 0;
+        sigv.sival_ptr = NULL;
+        sigqueue(pids[i], 9, sigv);
+        waitpid(pids[i], &status, 0);
+    }
+    char extension[10];
+    sprintf(extension, "%d", getpid());
+
+    char *logFile = malloc(strlen(logPath)+11);
+    strcpy(logFile, logPath);
+    strcat(logFile, extension);
+
+    FILE *log = fopen(logFile, "a");
+
+    free(logFile);
+
+    for(int i = 0; i < numMonitors; i++){
+        HTHash ht = countries[i];
+        for(int i = 0; i < ht->curSize; i++){
+            for(Listptr l = ht->ht[i]->next; l != l->tail; l = l->next){
+                HTEntry ht = l->value;
+                fprintf(log, "%s\n", (char *)ht->item); 
+            }
+        }
+    }
+
+    fprintf(log, "TOTAL TRAVEL REQUESTS %d\n", travelRequests);
+    fprintf(log, "ACCEPTED %d\n", accepted);
+    fprintf(log, "REJECTED %d\n", rejected);
+
+    fclose(log);
+    printf("Quiting...\n");
+}
 
 // String compare function wrapper
 int compareStr(void *a, void *b){
@@ -90,6 +140,13 @@ int getMonitorNum(int numMonitors, HTHash *countries, char *country){
 
 int main(int argc, char *argv[]){
 
+    struct sigaction act;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = SA_SIGINFO;
+    act.sa_sigaction = my_handler;
+    sigaction(SIGQUIT, &act, 0);
+    sigaction(SIGINT, &act, 0);
+
     int numMonitors;
     int bufferSize;
     int sizeOfBloom;
@@ -104,6 +161,11 @@ int main(int argc, char *argv[]){
   
     // FIFO file path
     char *myfifo = "./tmp/";
+
+    // Logfile path
+    char *logPath = "./logs/log_file.";
+
+    pid_t pids[numMonitors];
   
     for(int i = 0; i < numMonitors; i++){
 
@@ -134,6 +196,8 @@ int main(int argc, char *argv[]){
             // Forked process
             execl("./monitor", "./monitor", temp, temp2, (char *)NULL);
             exit(1);
+        }else{
+            pids[i] = pid;
         }
     }
 
@@ -347,7 +411,7 @@ int main(int argc, char *argv[]){
 
                 }else{
                     if(close(pfds[i].fd)){
-                        perror("close error\n");
+                        perror("close error");
                         exit(1);
                     }
                     pfds[i].fd = -1; //Ignore events on next call
@@ -356,22 +420,15 @@ int main(int argc, char *argv[]){
             }
         }
     }
-    
-    char id[5] = "5510";
-    vaccineStatusBloom(id, HTGetItem(viruses, "COWPOX"));
-
-    char idate[5] = "2057";
-    vaccineStatusBloom(idate, HTGetItem(viruses, "CHOLERA"));
-
-    char id3[5] = "7437";
-    vaccineStatusBloom(id3, HTGetItem(viruses, "SARS-1"));
-
-    vaccineStatusBloom(id, HTGetItem(viruses, "COVID-19"));
 
     char *inbuf = malloc(MAX_LINE*sizeof(char));
     memset(inbuf, 0, MAX_LINE);
 
     // Input loop
+
+    int totalRequested = 0;
+    int accepted = 0;
+    int rejected = 0;
 
     while(1){
         // Read input
@@ -380,11 +437,17 @@ int main(int argc, char *argv[]){
             char *token = strtok(inbuf, " \n"); 
 
             if(token == NULL){
-                fprintf(stderr, "ERROR1: INCORRECT SYNTAX\n\n");
+                fprintf(stderr, "ERROR: INCORRECT SYNTAX\n\n");
+                if(received_signal){
+                    signalResponse(numMonitors, pids, logPath, totalRequested, accepted, rejected, countries);
+                    break;
+                }
                 continue;
             }
 
             if(!strcmp(token, "/travelRequest")){
+                totalRequested++;
+
                 char *id;
                 char *date_str;
                 Date date;
@@ -395,35 +458,35 @@ int main(int argc, char *argv[]){
                 id = strtok(NULL, " \n");
 
                 if(id == NULL){
-                    fprintf(stderr, "ERROR2: INCORRECT SYNTAX\n\n");
+                    fprintf(stderr, "ERROR: INCORRECT SYNTAX\n\n");
                     continue;
                 }
 
                 date_str = strtok(NULL, " \n");
 
                 if(date_str == NULL){
-                    fprintf(stderr, "ERROR3: INCORRECT SYNTAX\n\n");
+                    fprintf(stderr, "ERROR: INCORRECT SYNTAX\n\n");
                     continue;
                 }        
 
                 countryFrom = strtok(NULL, " \n");
 
                 if(countryFrom == NULL){
-                    fprintf(stderr, "ERROR4: INCORRECT SYNTAX\n\n");
+                    fprintf(stderr, "ERROR: INCORRECT SYNTAX\n\n");
                     continue;
                 }
 
                 countryTo = strtok(NULL, " \n");
 
                 if(countryTo == NULL){
-                    fprintf(stderr, "ERROR5: INCORRECT SYNTAX\n\n");
+                    fprintf(stderr, "ERROR: INCORRECT SYNTAX\n\n");
                     continue;
                 }
 
                 virName = strtok(NULL, " \n");
 
                 if(virName == NULL){
-                    fprintf(stderr, "ERROR6: INCORRECT SYNTAX\n\n");
+                    fprintf(stderr, "ERROR: INCORRECT SYNTAX\n\n");
                     continue;
                 }
 
@@ -439,14 +502,14 @@ int main(int argc, char *argv[]){
                     date->month = atoi(datetok2); 
                     date->year = atoi(datetok3);
                 }else{
-                    fprintf(stderr, "ERROR7: INCORRECT SYNTAX\n\n");
+                    fprintf(stderr, "ERROR: INCORRECT SYNTAX\n\n");
                     free(date);
                     continue;
                 }
 
                 Virus v = HTGetItem(viruses, virName);
                 if(v == NULL){
-                    printf("No data about given virus\n\n");
+                    printf("ERROR: NO DATA ABOUT GIVEN VIRUS\n\n");
                     free(date);
                     continue;
                 }
@@ -490,14 +553,17 @@ int main(int argc, char *argv[]){
 
                         if(getDiffDate(date, vacc_date)/30 >= 6){
                             printf("REQUEST REJECTED – YOU WILL NEED ANOTHER VACCINATION BEFORE TRAVEL DATE\n\n");
+                            rejected++;
                         }else{
                             printf("REQUEST ACCEPTED – HAPPY TRAVELS\n\n");
+                            accepted++;
                         }
 
                         free(vacc_date);
 
                     }else if(!strcmp(buff, "NO")){
                         printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n\n");
+                        rejected++;
                     }
 
                     close(fd_arr[mon][1]);
@@ -506,6 +572,7 @@ int main(int argc, char *argv[]){
 
                 }else{
                     printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n\n");
+                    rejected++;
                 }
                 free(date);
             }
@@ -524,18 +591,20 @@ int main(int argc, char *argv[]){
 
                 break;
             }
+
+            // Wait for commands to be complete and then respond to signals
+            if(received_signal){
+                signalResponse(numMonitors, pids, logPath, totalRequested, accepted, rejected, countries);
+                break;
+            }
         }
     }
 
+    // Close file descriptors
+
     for(int i = 0 ; i < numMonitors; i++){
-        if(close(fd_arr[i][0])){
-            //perror("close error");
-            //exit(1);
-        }
-        if(close(fd_arr[i][1])){
-            //perror("close error");
-            //exit(1);
-        }
+        close(fd_arr[i][0]);
+        close(fd_arr[i][1]);
     }
 
     // Memory freeing
@@ -545,7 +614,6 @@ int main(int argc, char *argv[]){
     for(int i = 0; i < viruses->curSize; i++){
 		for(Listptr l = viruses->ht[i]->next; l != l->tail; l = l->next){
             HTEntry ht = l->value;
-            //free(ht->key);
             Virus v = ht->item;
             destroyVirus(v);
             free(v);
