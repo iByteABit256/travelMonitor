@@ -95,7 +95,7 @@ waits until completion of the current command and then
 sends SIGKILL to the monitors, generates a log file and
 exits after releasing all of its allocated memory.
 
-When receiving one of the formentioned signals,
+When receiving one of the forementioned signals,
 the monitors generate a log file, or append to
 and already existing one, and then continue
 running.
